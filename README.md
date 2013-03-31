@@ -7,19 +7,20 @@ Each data format or protocol needs its own methods of sanitizing data.
 
 Context is king:  Don't sanitize SQL queries with `wp_specialchars()`. Don't sanitize URLs with `$wpdb->escape()`.
 
- * Code injection: preg_replace/e
- * ...
 
 ### SQL Injection
 
-Attacker's goal: read from or write to your sites database.
+Attacker's goal: read from or write to your site's database.
 
-```
-SELECT * FROM `users` WHERE `name` = {$_GET['name']}
+```php
+<?php "SELECT * FROM `users` WHERE `name` = '{$_GET['name']}'"
 ```
 
-http://example.com/?name=%3B+DROP+TABLE+%60users%60
-> ``; DROP TABLE `users` ``
+http://example.com/?name=foo%27%3B+DROP+TABLE+%60users%60%3B%23%27Comment
+
+> ```sql
+> SELECT * FROM `users` WHERE `name` = 'foo'; DROP TABLE `users`;#'
+> ```
 
 * `$wpdb->prepare()`/`$wpdb->insert()`/`$wpdb->update()`
 * `like_escape()`
@@ -31,12 +32,15 @@ Attacker's goal: Inject Javascript into your site's HTML.
 
 #### Plain Ol' XSS
 
-```
+```php
 <a href="http://example.com/hello/?ref=<?php echo $_GET['ref']; ?>">Hello</a>
 ```
 
 http://example.com/?ref=foo%22+onclick%3D%22javascript%3Aalert%28%2FXSS%2F%29
-> `foo" onclick="javascript:alert(/XSS/)`
+
+> ```html
+> <a href="http://example.com/hello/?ref=foo" onclick="javascript:alert(/XSS/)">Hello</a>
+> ```
 
 * `esc_html()`, `esc_attr()`, `esc_url()`
 * `esc_js()`, `json_encode()`
@@ -44,22 +48,25 @@ http://example.com/?ref=foo%22+onclick%3D%22javascript%3Aalert%28%2FXSS%2F%29
 
 #### It happens in JS too
 
-```
+```js
 $( '#error' ).append( "Invalid input: " + $( '#input' ).val() );
 ```
 
-```
+```js
 val html = '<a href="' + document.location + '?fun=1">Click me for fun!</a>';
 ```
 
-> `http://example.com/#" onclick="alert(/XSS/);" data-foo="`
+[http://example.com/#" onclick="alert(/XSS/);" data-foo="](http://example.com/#" onclick="alert(/XSS/);" data-foo=")
 
+> ```js
+> val html = '<a href="http://example.com/#" onclick="alert(/XSS/);" data-foo="?fun=1">Click me for fun!</a>';
+> ```
 
 ```
 window.location = query_string['url'];
 ```
 
-> `http://example.com/?url=javascript%3Aalert%28%2FXXS%2F%29`
+http://example.com/?url=javascript%3Aalert%28%2FXXS%2F%29
 
 * Building HTML from strings is just like PHP: You have to escape everything
 * Difference between jQuery's `.html()` and `.text()`
@@ -68,17 +75,22 @@ window.location = query_string['url'];
 
 #### And CSS
 
-```
+```css+php
 background-image: url( <?php echo esc_url_raw( $url ); ?> );
 ```
 
 `http://foo.com/icon);font-size:expression(alert(/XSS/)`
 
+> ```css
+> background-image: url( http://foo.com/icon);font-size:expression(alert(/XSS/));
+> ```
+
+
 Seriously IE?
 
 Even if a browser won't execute `expression()`, we don't want a "URL" to be able to inject CSS rules.
 
-```
+```css+php
 background-image: url( "<?php echo addcslashes( esc_url_raw( $url ), '"' ); ?>" );
 ```
 
@@ -89,11 +101,18 @@ The way data is transfered between Flash and JS is very hard to secure correctly
 
 ### Header Splitting
 
-```
+```php
 header( "Location: {$_GET['redirect']}" )
 ```
 
 > `http://example.com/?redirect=http://example.com/%0DSet-Cookie:+wordpress_logged_in_123=+`
+
+> ```
+> HTTP/1.1 302 Moved Temporarily
+> Location: http://example.com/
+> Set-Cookie: wordpress_logged_in_123= 
+> ...
+> ```
 
 * Mitigated only as of PHP 5.3.11/5.4.0
 * Use `wp_redirect()`

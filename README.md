@@ -56,7 +56,8 @@ $( '#error' ).append( "Invalid input: " + $( '#input' ).val() );
 val html = '<a href="' + document.location + '?fun=1">Click me for fun!</a>';
 ```
 
-[http://example.com/#" onclick="alert(/XSS/);" data-foo="](http://example.com/#" onclick="alert(/XSS/);" data-foo=")
+[http://example.com/#"onclick="alert(/XSS/);"data-foo="][fancy-xss]
+[fancy-xss]: <http://example.com/#"onclick="alert(/XSS/);"data-foo=">
 
 > ```js
 > val html = '<a href="http://example.com/#" onclick="alert(/XSS/);" data-foo="?fun=1">Click me for fun!</a>';

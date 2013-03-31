@@ -60,7 +60,7 @@ val html = '<a href="' + document.location + '?fun=1">Click me for fun!</a>';
 [fancy-xss]: <http://example.com/#"onclick="alert(/XSS/);"data-foo=">
 
 > ```js
-> val html = '<a href="http://example.com/#" onclick="alert(/XSS/);" data-foo="?fun=1">Click me for fun!</a>';
+> val html = '<a href="http://example.com/#"onclick="alert(/XSS/);"data-foo="?fun=1">Click me for fun!</a>';
 > ```
 
 ```js

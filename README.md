@@ -13,7 +13,7 @@ Context is king:  Don't sanitize SQL queries with `wp_specialchars()`. Don't san
 Attacker's goal: read from or write to your site's database.
 
 ```php
-<?php "SELECT * FROM `users` WHERE `name` = '{$_GET['name']}'"
+"SELECT * FROM `users` WHERE `name` = '{$_GET['name']}'"
 ```
 
 http://example.com/?name=foo%27%3B+DROP+TABLE+%60users%60%3B%23%27Comment
@@ -32,7 +32,7 @@ Attacker's goal: Inject Javascript into your site's HTML.
 
 #### Plain Ol' XSS
 
-```php
+```html+php
 <a href="http://example.com/hello/?ref=<?php echo $_GET['ref']; ?>">Hello</a>
 ```
 
@@ -62,11 +62,16 @@ val html = '<a href="' + document.location + '?fun=1">Click me for fun!</a>';
 > val html = '<a href="http://example.com/#" onclick="alert(/XSS/);" data-foo="?fun=1">Click me for fun!</a>';
 > ```
 
-```
+```js
 window.location = query_string['url'];
 ```
 
 http://example.com/?url=javascript%3Aalert%28%2FXXS%2F%29
+
+> ```js
+> window.location = 'javascript:alert(/XSS/)';
+> ```
+
 
 * Building HTML from strings is just like PHP: You have to escape everything
 * Difference between jQuery's `.html()` and `.text()`

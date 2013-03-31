@@ -96,6 +96,8 @@ Seriously IE?
 
 Even if a browser won't execute `expression()`, we don't want a "URL" to be able to inject CSS rules.
 
+Add quotes and slashes.
+
 ```css+php
 background-image: url( "<?php echo addcslashes( esc_url_raw( $url ), '"' ); ?>" );
 ```

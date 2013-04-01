@@ -292,7 +292,7 @@ $name = esc_html( $_GET['name'] );
 echo $name; # is this safe? Depends on ...
 ```
 
-```
+```php
 $name = $_GET['name']
 ....
 echo esc_html( $name ); # is this safe? Yes.

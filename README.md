@@ -582,8 +582,7 @@ Exercises
 * Write data without permission.
 
 ### OPML Importer (XXE)
-* Get a list of PHP files on the server.
-* Read one.
+* Read something on the server you shouldn't be able to.
 
 ### PWN
 * Use a CSRF

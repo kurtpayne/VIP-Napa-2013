@@ -309,7 +309,7 @@ Trick a user into doing something they don't want to.
 CSRF: Cross Site Request Forgery
 --------------------------------
 
-=== Attacker's Goal
+### Attacker's Goal
 
 Without you knowing, trick you into performing some action the attacker can't do for themself.
 

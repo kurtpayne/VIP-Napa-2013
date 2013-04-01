@@ -579,13 +579,8 @@ Exercises
 * with an Open Redirect
 * to steal credentials of a registered user
 * so you can upload an XML file
-* that SSRFs
-
-
-* Use an Open Redirect
-* Use an XSS
-* To CSRF
-* an 
+* that SSRFs ... something
+* Needs work :)
 
 Links
 =====

@@ -433,6 +433,8 @@ Suppose your server hosts or otherwise has access to some internal service.
 
 `url=http://the-ceo:12345@directory.intranet/users/the-president/?_method=DELETE`
 
+Not so `wp`**`remote`**`_get()` now, are you?
+
 ### Solution
 
 Make sure the URL's protocol, host, port, etc. all makes sense.

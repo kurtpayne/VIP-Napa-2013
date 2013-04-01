@@ -461,9 +461,11 @@ if ( ! hash_exists( $hash ) ) {
 
 #### Attack: Phishing
 
-```html```
-
-You trust [Gravatar][http://www.gravatar.com/avatar/00000000000000000000000000000000.png?d=http://evil.com/], right?
+```html
+<p>
+	You trust <a href="http://www.gravatar.com/avatar/00000000000000000000000000000000.png?d=http://evil.com/">Gravatar</a>, right?
+</p>
+```
 
 #### Attack: OAuth
 

@@ -451,7 +451,7 @@ Resources on a server that will redirect to any other resource.
 
 ### Example
 
-http://www.gravatar.com/avatar/00000000000000000000000000000000.png?d={url}
+http://www.gravatar.com/avatar/00000000000000000000000000000000?d={url}
 
 ```php
 if ( ! hash_exists( $hash ) ) {
@@ -463,7 +463,7 @@ if ( ! hash_exists( $hash ) ) {
 
 ```html
 <p>
-	You trust <a href="http://www.gravatar.com/avatar/00000000000000000000000000000000.png?d=http://evil.com/">Gravatar</a>, right?
+	You trust <a href="http://www.gravatar.com/avatar/0?d=http://evil.com/">Gravatar</a>, right?
 </p>
 ```
 

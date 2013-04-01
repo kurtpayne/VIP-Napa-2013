@@ -585,5 +585,5 @@ Exercises
 Links
 =====
 
-http://phpsecurity.readthedocs.org/
-http://owasp.com/index.php/Main_Page
+* http://phpsecurity.readthedocs.org/
+* http://owasp.com/index.php/Main_Page

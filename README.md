@@ -556,6 +556,17 @@ In fact, you only need the following :)
 http://patriciopalladino.com/blog/2012/08/09/non-alphanumeric-javascript.html
 
 
+SSL Host Verification Off by Default :(
+---------------------------------------
+
+```php
+file_get_contents( 'https://example.com/' ); // :(
+```
+
+=== Solution
+
+Always use cURL.
+
 Exercises
 =========
 

@@ -563,7 +563,7 @@ SSL Host Verification Off by Default :(
 file_get_contents( 'https://example.com/' ); // :(
 ```
 
-=== Solution
+### Solution
 
 Always use cURL.
 

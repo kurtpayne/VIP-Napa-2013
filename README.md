@@ -43,8 +43,8 @@ $user = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `users` WHERE `name` = %s
 * `like_escape()`
 
 
-XSS
----
+XSS: Cross Site Scripting
+-------------------------
 
 ### Attacker's Goal
 
@@ -306,37 +306,234 @@ Attacks of Intent
 
 Trick a user into doing something they don't want to.
 
-CSRF
-----
+CSRF: Cross Site Request Forgery
+--------------------------------
 
-`<img src="http://example.com/delete-my-stuff-now/" />`
+=== Attacker's Goal
 
+Without you knowing, trick you into performing some action the attacker can't do for themself.
+
+Note: CSRF mitigation is useless if there is an XSS vulnerability.
+
+### Example
+
+```php
+if ( '/account/delete' === $_SERVER['REQUEST_URI'] ) {
+	delete_account( current_user_id() );
+}
+```
+
+#### Attack
+
+```html
+<h1>Look at this cool picture!</h1>
+<img src="http://example.com/account/delete" />
+```
+
+#### Result
+
+Your browser makes a request to that "image" URL and happily sends your example.com cookies along with it.
+
+#### Solution
+
+```php
+if ( '/account/delete' === $_SERVER['REQUEST_URI'] ) {
+	// Ensures the user followed a link that had been protected with wp_nonce_url()
+	check_admin_referer();
+
+	delete_account( current_user_id() );
+}
+```
+
+Request made != Request intended.
+
+Actions that require permissions should be protected with some secret unknown to the attacker and that will not be automatticaly sent by the browser.
+
+* `wp_nonce_url()`, `wp_nonce_field()`, (`wp_create_nonce()`)
+* `check_admin_referer()`, `check_ajax_referer()` (both badly named), (`wp_verify_nonce()`)
 
 Clickjacking
 ------------
 
-Transparent overlays. Cursor repositioning.
+A malicious site frames your site in an iframe and tricks visitors to interact with your site when they think they are interacting with the malicous site.
+
+To do this, the malicious site employs some form of UI trickery.
+* Overlaying your site transparently over your site.
+* Masking all but some piece of (now generic looking) UI under their site.
+* Using a custom CSS mouse cursor to make the visitor think they are clicking one place, when really they are clicking somewhere else.
+
+### Solution
+
+* `X-FRAME-OPTIONS` header.
+* Framebusting script for older browsers.
+
+```php
+header( 'X-FRAME-OPTIONS: SAMEORIGIN' );
+```
+
+```html
+<html class="inframe">
+<head>
+<title>Don't frame me, bro!</title>
+<style>
+.inframe {
+        display: none;
+}
+</style>
+<script type="text/javascript">
+if ( self === top ) {
+        document.documentElement.className = document.documentElement.className.replace( 'inframe', '' );
+} else {
+        top.location = self.location;
+}
+</script>
+</head>
+```
 
 Cross Iframe Communication
 --------------------------
 
-SSRF
-----
+Old techniques of communicating between iframes were insecure.
+* Updating URL #fragments
+* `window.name`
+* etc.
 
-Internal IPs, different protocols, username:password
+Don't use them.
+
+### Solution
+
+`window.postmessage()`
+
+SSRF: Server Side Request Forgery
+---------------------------------
+
+### Attacker's Goal
+
+Trick your server into making a request that only it can make.
+
+This is basically CSRF on the backend.
+
+### Example: Server-side script to make sure user-submitted URL is an image
+
+```php
+$url = filter_var( $_POST['url'], FILTER_VALIDATE_URL );
+if ( $url ) {
+	$image = wp_remote_get( $url );
+	if ( preg_match( '/image/', wp_remote_retrieve_header( $image, 'content-type' ) ) {
+		die( 'YAY! IMAGE!' );
+	}
+}
+
+die( 'BOO :( AM SAD' );
+```
+
+### Attack
+
+Suppose your server hosts or otherwise has access to some internal service.
+
+`url=http://the-ceo:12345@directory.intranet/users/the-president/?_method=DELETE`
+
+### Solution
+
+Make sure the URL's protocol, host, port, etc. all makes sense.
+
+See core's `pingback_ping_source_uri()` as an example.
+
+Note: The XXE example above incorporates another SSRF example.
+
 
 Open Redirects
 --------------
 
-Consider OAuth...
+Resources on a server that will redirect to any other resource.
+
+### Example
+
+http://www.gravatar.com/avatar/00000000000000000000000000000000.png?d={url}
+
+```php
+if ( ! hash_exists( $hash ) ) {
+	wp_redirect( $_GET['d'] );
+}
+```
+
+#### Attack: Phishing
+
+```html```
+
+You trust [Gravatar][http://www.gravatar.com/avatar/00000000000000000000000000000000.png?d=http://evil.com/], right?
+
+#### Attack: OAuth
+
+If an OAuth client has an open redirect, and the OAuth service is flexible enough with their redirect URLs, you can steal credentials :)
+
+#### Solution
+
+Only redirect to trusted URLs.
+
+* `wp_safe_redirect()`
+* Protect redirects with nonces or some other CSRF mitigation.
+
+Gravatar now serves images directly, rather than redirecting to arbitrary URLs.
+
 
 Everything
 ----------
- * Confidentality: Does it matter who sees your data?
- * Authentication: Do you need to know who sent the data you get? Do you need to know who receive the data you send?
- * What would happen if someone tried to forge the request/input?
- * What would happen if someone sent the requests you expect, but in the wrong order?
- * Don't allow requests to be spoofed: verify intent with secrets unavailable to the outside.
+
+* Confidentality: Does it matter who sees your data?
+* Authentication: Do you need to know who sent the data you get? Do you need to know who receive the data you send?
+* What would happen if someone tried to forge the request/input?
+* What would happen if someone sent the requests you expect, but in the wrong order?
+* Don't allow requests to be spoofed: verify intent with secrets unavailable to the outside.
+
+
+Gotchas
+=======
+
+`current_user_can() > is_user_logged_in()`
+------------------------------------------
+
+Always verify the user has permission to view, create, edit, etc.
+
+
+Strict Equality Checking
+------------------------
+* `===`
+* `in_array( $needle, $haystack, true )`
+
+```php
+10 == '10ab7c4f2e' # true
+ 0 == 'a75be5c82d' # true
+```
+
+This is especially important when verifying passwords, keys, hashes, etc.
+
+http://www.php.net/manual/en/types.comparisons.php
+
+
+`hash_hmac() > md5()`
+---------------------
+
+```php
+$hash = md5( $key . $data ); # Boo
+$hash = hash_hmac( 'md5', $data, $key ); # Yay!
+```
+
+[Hash length extension attack][http://en.wikipedia.org/wiki/Length_extension_attack]
+
+
+JS Sanitation Is Important
+--------------------------
+
+You don't need quotes to do anything in JavaScript.
+
+`/foo/.substr(1, 3)`
+
+In fact, you only need the following :)
+
+`()[]!+`
+
+http://patriciopalladino.com/blog/2012/08/09/non-alphanumeric-javascript.html
 
 
 Exercises
@@ -370,11 +567,8 @@ Exercises
 * To CSRF
 * an 
 
-Todo
-====
-* Strict equality checking?
-
 Links
 =====
 
 http://phpsecurity.readthedocs.org/
+http://owasp.com/index.php/Main_Page

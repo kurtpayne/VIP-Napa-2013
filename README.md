@@ -539,7 +539,7 @@ $hash = md5( $key . $data ); # Boo
 $hash = hash_hmac( 'md5', $data, $key ); # Yay!
 ```
 
-[Hash length extension attack][http://en.wikipedia.org/wiki/Length_extension_attack]
+[Hash length extension attack](http://en.wikipedia.org/wiki/Length_extension_attack)
 
 
 JS Sanitation Is Important

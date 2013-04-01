@@ -515,6 +515,22 @@ This is especially important when verifying passwords, keys, hashes, etc.
 http://www.php.net/manual/en/types.comparisons.php
 
 
+Your MySQL Collation is Probably Case Insensitive
+-------------------------------------------------
+
+```sql
+SELECT `id`, `secret` FROM `user_secrets` WHERE `secret` = 'abc123';
+--> 1, AbC123
+```
+
+### Solution
+
+```sql
+SELECT `id`, `secret` FROM `user_secrets` WHERE `secret` = BINARY 'abc123';
+--> 7, abc123
+```
+
+
 `hash_hmac() > md5()`
 ---------------------
 

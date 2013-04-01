@@ -185,7 +185,7 @@ eval()
 
 Obvious.
 
-### Example
+### Example: Regex
 
 ```php
 // preg_replace( '//e' ) a.k.a. PREG_REPLACE_EVAL
@@ -231,7 +231,8 @@ XML is extra awesome.  It lets you reference external resources in those definit
 
 ### Example
 
-```html?php
+```html+php
+<?php
 $xml = simplexml_load_file( $uploaded_file );
 ?>
 <h1><?php printf( "%s Uploaded!", esc_html( $xml->title ) ); ?></h1>
@@ -250,24 +251,25 @@ $xml = simplexml_load_file( $uploaded_file );
 #### Result
 
 ```html
-<h1>define(&#039;DB_NAME&#039;, &#039;database_name_here&#039;);
-define(&#039;DB_USER&#039;, &#039;username_here&#039;);
-define(&#039;DB_PASSWORD&#039;, &#039;password_here&#039;);
-define(&#039;SECURE_AUTH_KEY&#039;,  &#039;RTYi7!;x+mRUi*+/%]1)A^{lPLNO-Wr [D4VWWB}ebFf?:L[Ko89wb-WS+-LwYE}&#039;);
-define(&#039;SECURE_AUTH_SALT&#039;, &#039;f8zFa!&gt;__yxv5$v:]ad~~8;9/|ai++%F`;x]VgX%&gt;q*dk~O~G7q1X|/jQb12OKp;&#039;);
-define(&#039;NONCE_KEY&#039;,        &#039;f0h1rhp4V|+%xc?g|c|Q~`Ih%c 1L.,xxY^M}z87;4-(P;B=VwsoaPqc_AG2tQ]-&#039;);
-define(&#039;NONCE_SALT&#039;,       &#039;UqtXSfr@PkErk|JX;wg^L*hsi9%17z0#T[2qdAa!V=MwREk2*q6lj6lK4&lt;=axpU7&#039;);
+<h1>define('DB_NAME', 'database_name_here');
+define('DB_USER', 'username_here');
+define('DB_PASSWORD', 'password_here');
+define('SECURE_AUTH_KEY',  'RTYi7!;x+mRUi*+/%]1)A^{lPLNO-Wr [D4VWWB}ebFf?:L[Ko89wb-WS+-LwYE}');
+define('NONCE_KEY',        'f0h1rhp4V|+%xc?g|c|Q~`Ih%c 1L.,xxY^M}z87;4-(P;B=VwsoaPqc_AG2tQ]-');
+define('SECURE_AUTH_SALT', 'f8zFa!>__yxv5$v:]ad~~8;9/|ai++%F`;x]VgX%>q*dk~O~G7q1X|/jQb12OKp;');
+define('NONCE_SALT',       'UqtXSfr@PkErk|JX;wg^L*hsi9%17z0#T[2qdAa!V=MwREk2*q6lj6lK4<=axpU7');
 ... Uploaded!</h1>
 ```
 
 #### Solution
 
-```html?php
+```html+php
+<?php
 libxml_disable_entity_loader( true );
 $xml = simplexml_load_file( $uploaded_file );
 ?>
 <h1><?php printf( "%s Uploaded!", esc_html( $xml->title ) ); ?></h1>
-
+```
 
 Everything
 ----------

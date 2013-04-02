@@ -1,0 +1,54 @@
+# Injection Attacks
+ * Context is king
+ * SQL Injection
+ * XSS
+  * PHP
+  * JS
+  * CSS
+  * Flash
+ * Header Splitting
+ * PHP Code Injection
+  * <code>eval()</code>
+  * <code>preg_replace( //e )</code>
+ * System (<code>system()</code>, ...)
+ * XXE
+ * Summary
+# Attacks of Intent
+ * CSRF
+ * Clickjacking
+ * Cross Iframe Communication
+ * SSRF
+ * Open Redirects
+  * Phishing
+  * OAuth
+ * Summary
+# Gotchas
+ * Permissions
+ * Strict Equality Checking
+ * MySQL Collations
+ * HMACs
+ * JS Voodoo
+  * <code>/foo/.substr(1, 3)</code>
+  * ()[]!+
+ * SSL Sadness: <code>file_get_contents( 'https://example.com/' )</code>
+# Possible Exercises
+ # Chat widget (XSS)
+  * Steal another user's credentials.
+  * Speak as that user.
+ # Log parser (SQLI)
+  * Falsify data.
+ # Blog Privacy Plugin (In the Wild)
+  * Read sensitive date.
+  * Write data without permission.
+ # OPML Importer (XXE)
+  * Read something on the server you shouldn't be able to.
+ # PWN
+  * Use a CSRF
+  * with an Open Redirect
+  * to steal credentials of a registered user
+  * so you can upload an XML file
+  * that SSRFs ... something
+  * Needs work :)
+# Links
+ * http://phpsecurity.readthedocs.org/
+ * http://owasp.com/index.php/Main_Page

@@ -162,7 +162,7 @@ function with_cache_lock_and_fallback( $callback, $key, $group, $expires = 30 ) 
 		// Tell other processes to fallback if possible
 		// MC adds succeed only if there is not already a value for that key, but
 		// DANGER: not multi-DC aware
-		$added = wp_cache_add( $key, '--FALBACK--', $group, $expires )
+		$added = wp_cache_add( $key, '--FALLBACK--', $group, $expires )
 
 		if ( $added ) {
 			// This process successfully added

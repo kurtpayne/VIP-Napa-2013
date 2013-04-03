@@ -223,6 +223,7 @@ APC: Alternative PHP Cache
 ==========================
 
 APC does two things:
+
 1. Caches the intermediate bytecode of PHP files so that they don't have to be compiled for every request.  Just executed.
 2. Provides a persistent, shared-memory key-value store.
 

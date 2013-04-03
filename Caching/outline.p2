@@ -1,0 +1,19 @@
+# Memcached
+ * Persistent cache.  Shared by all web servers.
+ * Exposed through core functions.
+ * Examples
+  # Simple cache
+  # Cache object IDs of complicated queries.  Cache objects by ID separately: cache of objects shared among queries.
+   * Is caching the individual objects worth it?
+  # Get many objects by ID with `get_multi()`
+  # You can't directly flush cache groups in Memcached.  Can implement via `increment()`.
+  # Cache Miss Stampedes: Need locking and fallback.  Can implement locking with `add()`.
+   * Core has locks too: WP Cron :)
+   * Do you need to lock? Try to prime cache on write, rather than regenerate cache on read.
+  # Non-Critical State: Remote host status in `wpcom_vip_file_get_contents()`.
+# APC
+ * Bytecode cache.  Good Thing.
+ * Persistent Key/Value store.
+  * Unlike memcached, host specific.  Memory is shared between processes but not between servers.
+  * HyperDB
+  * Site-wide data used on every page load that rarely changes.  WP.com doesn't use this.

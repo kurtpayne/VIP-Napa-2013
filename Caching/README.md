@@ -149,6 +149,8 @@ The above snippet initializes the incrementor with `time()`, but the issue remai
 
 WordPress.com uses a (slightly more complicated) version of this pattern for our "Advanced Post Cache".  Mostly successfully :)
 
+Core tried increments and failed http://core.trac.wordpress.org/changeset/23401. Switched to `microtime()` instead.
+
 
 Locking and Fallback
 --------------------

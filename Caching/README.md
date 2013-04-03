@@ -137,7 +137,7 @@ function get_cache_group( $group ) {
 }
 
 function flush_cache_group( $group ) {
-	return wp_cache_increment( $group, 'group_incrementors' ]);
+	return wp_cache_increment( $group, 'group_incrementors' );
 }
 ```
 

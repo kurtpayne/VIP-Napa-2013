@@ -141,6 +141,15 @@ function flush_cache_group( $group ) {
 }
 ```
 
+A word of caution: Eviction.
+
+If your incrementors and data are in different Memcached buckets, your incrementors can get evicted before your data does. That means your incrementor can get *lowered* to an old value, which could cause stale data to be served.
+
+The above snippet initializes the incrementor with `time()`, but the issue remains. There are probably race conditions when everything is stored in the same bucket as well.
+
+WordPress.com uses a (slightly more complicated) version of this pattern for our "Advanced Post Cache".  Mostly successfully :)
+
+
 Locking and Fallback
 --------------------
 

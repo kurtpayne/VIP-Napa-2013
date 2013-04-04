@@ -390,6 +390,12 @@ if ( self === top ) {
 </head>
 ```
 
+Why the CSS trick?
+
+* `<iframe sandbox>`
+* `<iframe security="restricted">`
+
+
 Cross Iframe Communication
 --------------------------
 

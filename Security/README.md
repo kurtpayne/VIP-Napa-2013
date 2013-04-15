@@ -638,6 +638,61 @@ file_get_contents( 'https://example.com/' ); // :(
 
 Always use cURL.
 
+Always use exit/die after a redirect
+------------------------------------
+
+```php
+<?php
+
+require 'wp-load.php';
+if ( empty( $_GET['token'] ) || 'some-token' === $_GET['token'] )
+	wp_safe_redirect( 'Location: /' );
+
+readfile( __FILE__ );
+
+exit();
+```
+### Attack
+```
+$ curl -v http://192.168.1.40/trunk/demo.php
+* About to connect() to 192.168.1.40 port 80 (#0)
+*   Trying 192.168.1.40... connected
+> GET /trunk/demo.php HTTP/1.1
+> User-Agent: curl/7.22.0 (x86_64-pc-linux-gnu) libcurl/7.22.0 OpenSSL/1.0.1 zlib/1.2.3.4 libidn/1.23 librtmp/2.3
+> Host: 192.168.1.40
+> Accept: */*
+> 
+< HTTP/1.1 302 Found
+< Date: Fri, 12 Apr 2013 13:50:58 GMT
+< Server: Apache/2.2.22 (Ubuntu)
+< X-Powered-By: PHP/5.4.13-2~precise+1
+< Location: http://192.168.1.35/trunk/wp-admin/
+< Vary: Accept-Encoding
+< Content-Length: 164
+< Content-Type: text/html
+< 
+<?php
+
+require 'wp-load.php';
+if ( empty( $_GET['token'] ) || 'some-token' === $_GET['token'] )
+	wp_safe_redirect( 'Location: /' );
+
+readfile( __FILE__ );
+
+exit();
+* Connection #0 to host 192.168.1.40 left intact
+* Closing connection #0
+```
+
+### Solution
+
+```php
+if ( empty( $_GET['token'] ) || 'some-token' === $_GET['token'] ) {
+	wp_safe_redirect( 'Location: /' );
+	exit();
+}
+```
+
 Exercises
 =========
 

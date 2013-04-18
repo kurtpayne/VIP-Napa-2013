@@ -62,6 +62,7 @@ Function.prototype.bind = Function.prototype.bind || function (thisp) {
 		this.$form.submit( this.send.bind( this ) );
 
 		this.interval = setInterval( this.poll.bind( this ), 3000 );
+		this.since = (new Date).toISOString();
 
 		ChatSploit.chats[this.$el.attr( 'id' )] = this;
 	}
@@ -86,7 +87,7 @@ Function.prototype.bind = Function.prototype.bind || function (thisp) {
 	function poll() {
 		console.log( "POLL" );
 		$.get( this.ajaxURL, {
-			since: this.since ? this.since : parseInt( Date.now() / 1000, 10 )
+			since: this.since
 		} ).done( this.receive.bind( this ) );
 	}
 

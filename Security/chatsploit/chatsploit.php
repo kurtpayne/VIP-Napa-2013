@@ -2,7 +2,7 @@
 
 /*
  * Plugin Name: Chat Sploit!
- * Description: Chat Widget vulnerable to XXS.  Don't fix it.  Figure out how to exploit it. Goal: Log in as author, and make admin say something.
+ * Description: Chat Widget vulnerable to XXS (and more!).  Don't fix it.  Figure out how to exploit it. Goal: Log in as author, and make admin say something.
  * Author: malwaffe
  */
 
@@ -120,28 +120,17 @@ class Chat_Sploit {
 
 		header( 'Content-Type: application/json' );
 
-		$since = (int) $_GET['since'];
-		$now = time();
-		if ( $now - 600 < $since ) {
-			$since = gmdate( 'Y-m-d H:i:s', $since );
-		} else {
-			$since = gmdate( 'Y-m-d H:i:s', $now );
-		}
+		$since = stripslashes( $_GET['since'] ); // WP slashes $_GET
 
 		$chats = $wpdb->get_results( $wpdb->prepare(
 			"SELECT `comment_author` AS author, `comment_content` AS text, `comment_date_gmt` AS time FROM `$wpdb->comments` " .
-			"WHERE `comment_post_ID` = %d AND `comment_date_gmt` > %s ORDER BY `comment_date_gmt` ASC",
-
-			$this->post_id, $since
+			"WHERE `comment_post_ID` = $this->post_id AND `comment_date_gmt` > '$since' ORDER BY `comment_date_gmt` ASC"
 		) );
 
 		$last = end( $chats );
 		if ( $last ) {
 			$since = $last->time;
 		}
-
-		$since = date_create( $since, timezone_open( 'UTC' ) );
-		$since = $since->getTimestamp();
 
 		die( json_encode( compact( 'since', 'chats' ) ) );
 	}

@@ -73,10 +73,14 @@ Function.prototype.bind = Function.prototype.bind || function (thisp) {
 	}
 
 	function send( event ) {
+		var chat = $( '<chat />' );
+
 		console.log( "SEND" );
 		event.preventDefault();
 
-		$.post( this.ajaxURL, this.$form.serialize() ).done( this.clear.bind( this ) );
+		chat.text( this.$form.find( 'textarea' ).val() );
+
+		$.post( this.ajaxURL, chat.get(0).outerHTML ).done( this.clear.bind( this ) );
 	}
 
 	function clear() {

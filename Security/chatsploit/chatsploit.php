@@ -96,6 +96,9 @@ class Chat_Sploit {
 	 * Process a chat submission. Store new chat as a comment.
 	 */
 	function submit() {
+		// <chat>some text</chat>
+		$text = (string) simplexml_load_file( "php://input" );
+
 		$user = wp_get_current_user();
 
 		$comment_id = (int) wp_insert_comment( array(
@@ -104,7 +107,7 @@ class Chat_Sploit {
 			'comment_author_IP' => $_SERVER['REMOTE_ADDR'],
 			'comment_date' => current_time( 'mysql' ),
 			'comment_date_gmt' => current_time( 'mysql', true ),
-			'comment_content' => $_POST['text'],
+			'comment_content' => $text,
 			'comment_approved' => 1,
 			'user_id' => $user->ID,
 		) );

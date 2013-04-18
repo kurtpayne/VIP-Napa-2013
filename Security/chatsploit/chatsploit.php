@@ -120,7 +120,7 @@ class Chat_Sploit {
 
 		header( 'Content-Type: application/json' );
 
-		$since = stripslashes( $_GET['since'] ); // WP slashes $_GET
+		$since = stripslashes( $_GET['since'] ); // WP slashes $_GET, but we use ::prepare() below
 
 		$chats = $wpdb->get_results( $wpdb->prepare(
 			"SELECT `comment_author` AS author, `comment_content` AS text, `comment_date_gmt` AS time FROM `$wpdb->comments` " .

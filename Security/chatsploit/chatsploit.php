@@ -106,7 +106,6 @@ class Chat_Sploit {
 			'comment_date_gmt' => current_time( 'mysql', true ),
 			'comment_content' => $_POST['text'],
 			'comment_approved' => 1,
-			'comment_type' => 'chatsploit',
 			'user_id' => $user->ID,
 		) );
 
@@ -131,7 +130,7 @@ class Chat_Sploit {
 
 		$chats = $wpdb->get_results( $wpdb->prepare(
 			"SELECT `comment_author` AS author, `comment_content` AS text, `comment_date_gmt` AS time FROM `$wpdb->comments` " .
-			"WHERE `comment_post_ID` = %d AND `comment_type` = 'chatsploit' AND `comment_date_gmt` > %s ORDER BY `comment_date_gmt` ASC",
+			"WHERE `comment_post_ID` = %d AND `comment_date_gmt` > %s ORDER BY `comment_date_gmt` ASC",
 
 			$this->post_id, $since
 		) );

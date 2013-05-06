@@ -15,8 +15,78 @@ Memcached
 
 WordPress.com uses memcached as a persistent cache.  The cache is exposed through core's `wp_cache_*()` functions.
 
-Cache
------
+CRUD API
+--------
+
+### Create
+
+```php
+// Overwrites any pre-existing data in that key/group.
+wp_cache_set( $key, $value, $group, $expiry = null );
+
+// Only succeeds if nothing exists already in that key/group.
+wp_cache_add( $key, $value, $group, $expiry = null );
+```
+
+### Read
+
+```php
+wp_cache_get( $key, $group );
+
+// $array = [ $group => [ $key1, $key2, ... ], ... ];
+// Return value is annoying
+wp_cache_multi( $array );
+```
+
+### Update
+
+```php
+// Only succeeds if something exists already in that key/group.
+wp_cache_replace( $key, $value, $group, $expiry = null );
+
+wp_cache_incr( $key, $number, $group );
+
+wp_cache_decr( $key, $number, $group );
+```
+
+### Delete
+
+```php
+wp_cache_delete( $key, $group );
+```
+
+### Not Implemented by WordPress
+
+* append/prpend for working with Memcached Lists
+* CAS: Check and Set (Compare and Swap)
+
+WordPress.com Idiosyncracy
+--------------------------
+
+WordPress.com maintains a separate Memcached pool in each of its three datacenters.
+
+By design, the pools are not required to be in sync.
+
+To avoid cache-based data poisoning, though, most write operations are replicated to each pool.
+
+### Replicated Operations
+* `wp_cache_set()`,
+* `wp_cache_replace()`,
+* `wp_cache_delete()`,
+* `wp_cache_incr()`, and
+* `wp_cache_decr()`.
+
+### Unreplicated Operations
+* `wp_cache_add()`
+
+This difference further complicates choosing between set and add.
+
+My suggestion: use add unless you have a reason to use set.
+
+Caching Items in a Set
+----------------------
+
+Typical use case: cache on demand.
 
 ```php
 function get_things( $args ) {

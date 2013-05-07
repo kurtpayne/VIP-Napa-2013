@@ -1,0 +1,1806 @@
+<div style="text-align: center;">
+
+<h2>Advanced Cacheing Patterns</h2>
+
+[vip_logo]
+
+mdawaffe
+</div>
+
+<!--nextpage-->
+
+<h2>mdawaffe = Mike Adams</h2>
+<ul>
+	<li>Automattic for ~7 years</li>
+	<li>WordPress Developer ~9 years</li>
+	<li>Currently work on Team Data</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Slow Things Suck</h2>
+
+If something is slow, we have to fix it.
+
+First step: Make it faster.  Fast things don't suck.
+
+If we can't, we need to:
+<ol>
+	<li>Cache it.</li>
+	<li>Avoid stampedes with locking.</li>
+	<li>Prime the cache.</li>
+	<li>Get rid of it :)</li>
+</ol>
+
+4 &gt; 3 &gt; 2 &gt; 1.
+
+<!--nextpage-->
+
+<h2>Where to Cache</h2>
+
+<ul>
+	<li>WordPress</li>
+	<li>Memcached</li>
+	<li>APC</li>
+	<li>nginx</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>WordPress</h2>
+
+WordPress has lots of places to store data.
+
+<ul>
+	<li>Options</li>
+	<li>Transients</li>
+	<li>Post Meta</li>
+	<li>Custom Post Type</li>
+	<li>Comment Meta</li>
+	<li>Custom Comment Type</li>
+</ul>
+
+These are all good places to store data you need cached in a truly-persistent and replicated way.
+
+<!--nextpage-->
+
+<h2>Options</h2>
+
+All options are loaded on all pageloads.
+If you don't need the data often, don't store it in options.
+
+Note: For performance reasons, WordPress.com limits a site's options size to less than 1MB total (aggregate over all options).
+
+<h3>Example: Multisite Post Counts</h3>
+[code lang=php]
+/**
+ * Update a blog's post count.
+ *
+ * WordPress MS stores a blog's post count as an option
+ * so as to avoid extraneous COUNTs when a blog's details
+ * are fetched with get_blog_details(). This function is
+ * called when posts are published to make sure the count
+ * stays current.
+ *
+ * @since MU
+ */
+function update_posts_count( $deprecated = '' ) {
+  global $wpdb;
+  update_option( 'post_count', (int) $wpdb->get_var(
+    "SELECT COUNT(ID)
+      FROM {$wpdb->posts}
+      WHERE post_status = 'publish'
+        and post_type = 'post'"
+  ) );
+}
+[/code]
+
+<h3>Example: Akismet</h3>
+[code lang=php]
+// Check the server connectivity and store the results
+// in an option.
+// Cached results will be used if not older than the
+// specified timeout in seconds;
+// use $timeout = 0 to force an update.
+// Returns the same associative array as
+// akismet_check_server_connectivity()
+function get_server_connectivity( $timeout = 86400 ) {
+  $servers = get_option('akismet_available_servers');
+  $update_time = get_option('akismet_connectivity_time');
+
+  if (
+    ( time() - $update_time ) < $timeout )
+  &&
+    $servers !== false
+  )
+    return $servers;
+
+  // There's a race condition here but the effect is
+  // harmless.
+  $servers = akismet_check_server_connectivity();
+  update_option('akismet_available_servers', $servers);
+  update_option('akismet_connectivity_time', time());
+  return $servers;
+}
+[/code]
+
+<h3>More Core Examples</h3>
+<ul>
+	<li><code>rewrite_rules</code></li>
+	<li><code>permalink_structure</code></li>
+	<li><code>{$taxonomy}_children</code></li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Transients</h2>
+
+On sites with <strong>no persistent caching backend</strong>, transients are implemented internally by WordPress via the <strong>options table</strong>.
+<ul>
+	<li>
+		The same caution with options applies to transients,
+		though expiring transients are (probably) not autoloaded.
+	</li>
+	<li>
+		Expired transients don't get culled as they expire.
+		They only get removed when they are accessed.
+	</li>
+	<li>Plugins/themes should clean up after themselves on deactivate just like with options.</li>
+</ul>
+
+On sites <strong>with a persistent caching backend</strong>, that's what transients use.
+<ul>
+	<li>On WordPress.com, that means Memcached, which is only quasi-persistent.</li>
+</ul>
+
+<h3>Example: <code>fetch_feed()</code></h3>
+[editor lang=php]
+$url = get_feed_link();
+$key = 'feed_' . md5( $url );
+
+delete_transient( $key );
+
+$a = microtime( true );
+fetch_feed( $url );
+$b = microtime( true );
+fetch_feed( $url );
+$c = microtime( true );
+
+var_dump( $b - $a );
+var_dump( $c - $b );
+var_dump( get_transient( $key ) );
+[/editor]
+
+<!--nextpage-->
+
+<h2>Post/Comment Meta</h2>
+
+The first time any meta item is accessed, all meta items for that post/comment are queried and cached.
+
+As with options, be judicious about storing data in meta.
+
+<h3>Example: oEmbed</h3>
+[code lang=php]
+$cachekey = '_oembed_' . md5( $url . serialize( $attr ) );
+if ( $this->usecache ) {
+  $cache = get_post_meta( $post_ID, $cachekey, true );
+
+  // Failures are cached
+  if ( '{{unknown}}' === $cache )
+    return $this->maybe_make_link( $url );
+
+  if ( ! empty( $cache ) )
+    return apply_filters(
+      'embed_oembed_html',
+      $cache, $url, $attr, $post_ID
+    );
+}
+
+// Use oEmbed to get the HTML
+$html = wp_oembed_get( $url, $attr );
+
+// Cache the result
+$cache = ( $html ) ? $html : '{{unknown}}';
+update_post_meta( $post_ID, $cachekey, $cache );
+[/code]
+
+<h3>Example: Media Enclosures</h3>
+
+<code>do_enclose()</code>
+
+<!--nextpage-->
+
+<h2>Custom Post/Comment Types</h2>
+
+Make sure you get your permissions right :)
+
+<h3>Examples</h3>
+<ul>
+	<li>A neat one from Metro we'll talk about later.</li>
+	<li>
+		Time uses a CPT to store options.
+		Do you use those options as a cache for anything?
+	</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Memcached</h2>
+
+WordPress.com uses Memcached as a quasi-persistent cache. The cache is exposed through core's <code>wp_cache_*()</code> functions.
+
+It's only quasi-persistent because Memcached evicts old, infrequently accessed items to free up memory for new items.
+
+<!--nextpage-->
+
+<h2>CRUD API</h2>
+<h3>Create</h3>
+[code lang=php]
+// Overwrites any pre-existing data in that key/group.
+wp_cache_set( $key, $value, $group, $expiry = null );
+
+// Only succeeds if nothing exists in that key/group.
+wp_cache_add( $key, $value, $group, $expiry = null );
+[/code]
+
+<h3>Read</h3>
+[code lang=php]
+// $force bypasses the local, in-memory cache and
+//   go straight to Memcached
+// &$found out-variable to disambiguate a stored
+//   (and found) FALSE value.
+wp_cache_get( $key, $group,
+  $force = false, &$found = null );
+
+// $array = [ $group => [ $key1, $key2, ... ], ... ];
+// Return value is annoying
+wp_cache_get_multi( $array );
+[/code]
+
+<strong>Warning</strong>: <code>wp_cache_get_multi()</code> isn't defined in core.
+
+Worse, it has different signatures in different cache backends.
+
+<h3>Update</h3>
+[code lang=php]
+// Only succeeds if something exists in that key/group.
+wp_cache_replace( $key, $value, $group, $expiry = null );
+
+wp_cache_incr( $key, $number, $group );
+
+wp_cache_decr( $key, $number, $group );
+[/code]
+
+<h3>Delete</h3>
+[code lang=php]
+wp_cache_delete( $key, $group );
+[/code]
+
+<h3>Not Implemented by WordPress</h3>
+<ul>
+	<li>append/prepend for working with Memcached Lists</li>
+	<li>CAS: Check and Set (Compare and Swap)</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Memcached Add v. Set</h2>
+
+<h3><code>wp_cache_add()</h3>
+[editor lang=php]
+$cheddar = wp_cache_get( 'cheddar', 'cheeses', false, $found );
+printf( "GET CHEDDAR: %s, FOUND: %d\n", var_export( $cheddar, 1 ), $found );
+
+$added = wp_cache_add( 'cheddar', 'tasty', 'cheeses' );
+printf( "ADD CHEDDAR: %d\n", $added );
+
+$cheddar = wp_cache_get( 'cheddar', 'cheeses', false, $found );
+printf( "GET CHEDDAR: %s, FOUND: %d\n", var_export( $cheddar, 1 ), $found );
+[/editor]
+
+
+<h3><code>wp_cache_set()</h3>
+[editor lang=php]
+$swiss = wp_cache_get( 'swiss', 'cheeses', false, $found );
+printf( "GET SWISS: %s, FOUND: %d\n", var_export( $swiss, 1 ), $found );
+
+$added = wp_cache_set( 'swiss', 'holey', 'cheeses' );
+printf( "SET SWISS: %d\n", $added );
+
+$swiss = wp_cache_get( 'swiss', 'cheeses', false, $found );
+printf( "GET SWISS: %s, FOUND: %d\n", var_export( $swiss, 1 ), $found );
+[/editor]
+
+[editor lang=php]
+wp_cache_delete( 'cheddar', 'cheeses' );
+wp_cache_delete( 'swiss', 'cheeses' );
+echo( "DELORTED!\n" );
+[/editor]
+
+<h3>Lesson?</h3>
+
+Add is useful for locking and avoiding race conditions.
+
+Honeybadger don't care and prefers set.
+
+<!--nextpage-->
+
+<h2>WordPress.com Memcached Idiosyncracy</h2>
+
+WordPress.com maintains a separate Memcached pool in each of its three datacenters.
+
+By design, the pools are not expected to be in sync.
+
+To avoid cache-based data poisoning, most write operations are replicated to each pool.
+
+<h3>Replicated Operations</h3>
+<ul>
+	<li><code>wp_cache_set()</code>,</li>
+	<li><code>wp_cache_replace()</code>,</li>
+	<li><code>wp_cache_delete()</code>,</li>
+	<li><code>wp_cache_incr()</code>, and</li>
+	<li><code>wp_cache_decr()</code>.</li>
+</ul>
+
+<h3>Unreplicated Operations</h3>
+<ul>
+	<li><code>wp_cache_add()</code></li>
+</ul>
+
+This difference further complicates choosing between set and add.
+
+My suggestion: use add unless you have a reason to use set.
+
+<!--nextpage-->
+
+<h2>Example: Caching Queries of Items in a Set</h2>
+
+We have a set of things we want to query:
+<ul>
+	<li>Get most recent 10 things,</li>
+	<li>Get things that start with "c",</li>
+	<li>etc.</li>
+</ul>
+
+Typical pattern: cache on demand.
+
+<!--nextpage-->
+
+<h2>Cache Query</h2>
+
+Just cache the full response. Fine for small objects that don't often get queried in different ways.
+
+[code lang=php]
+function get_things( $args ) {
+  $key = md5( serialize( $args ) );
+  $things = wp_cache_get( $key, 'things', false, $found );
+
+  if ( $found ) {
+    return $things;
+  }
+
+  $things = raw_get_things( $args );
+
+  wp_cache_add( $key, $things, 'things', 300 );
+
+  return $things;
+}
+[/code]
+
+[editor lang=php memcached=debug]
+function do_pageload() {
+  echo "First Requests\n";
+  do_requests();
+  echo "Second Requests\n";
+  do_requests();
+}
+
+function do_requests() {
+  $a = microtime( true );
+  get_things( array( 'number' => 4 ) );
+  $b = microtime( true );
+  get_things( array( 'number' => 3 ) );
+  $c = microtime( true );
+
+  printf( "get_things(4) : %8.6f\n", $b - $a );
+  printf( "get_things(3) : %8.6f\n", $c - $b );
+}
+
+wp_cache_flush();
+echo "FIRST PAGELOAD\n";
+do_pageload();
+
+echo "\n";
+
+wp_cache_flush_local();
+echo "SECOND PAGELOAD\n";
+do_pageload();
+[/editor]
+
+<!--nextpage-->
+
+<h2>Cache by ID</h2>
+
+Caching each thing object separately means those cached copies can be used by other queries too.
+
+[code lang=php]
+function get_things( $args ) {
+  $ids = get_thing_ids( $args );
+
+  return array_combine(
+    $ids,
+    array_map( 'get_thing', $ids )
+  );
+}
+
+// Cache each thing object separately
+function get_thing( $id ) {
+  $thing = wp_cache_get( $id, 'thing', false, $found );
+  if ( $found ) {
+    return $thing;
+  }
+
+  $thing = raw_get_thing( $id );
+
+  wp_cache_add( $id, $thing, 'thing' );
+
+  return $thing;
+}
+
+// Cache query as list of IDs instead of
+// list of thing objects
+function get_thing_ids( $args ) {
+  $key = md5( serialize( $args ) );
+  $ids = wp_cache_get( $key, 'thing_ids', false, $found );
+  if ( $found ) {
+    return $ids;
+  }
+
+  $ids = raw_get_thing_ids( $args );
+
+  wp_cache_add( $key, $ids, 'thing_ids', 300 );
+
+  return $ids;
+}
+[/code]
+
+Note that get_thing() may not be any faster with caching. PK lookups are fast. Depends on your infrastructure. Consider non-persistent cache group.
+
+[editor lang=php memcached=debug]
+function do_pageload() {
+  echo "First Requests\n";
+  do_requests();
+  echo "Second Requests\n";
+  do_requests();
+}
+
+function do_requests() {
+  $a = microtime( true );
+  get_things( array( 'number' => 4 ) );
+  $b = microtime( true );
+  get_things( array( 'number' => 3 ) );
+  $c = microtime( true );
+
+  printf( "get_things(4) : %8.6f\n", $b - $a );
+  printf( "get_things(3) : %8.6f\n", $c - $b );
+}
+
+wp_cache_flush();
+echo "FIRST PAGELOAD\n";
+do_pageload();
+
+echo "\n";
+
+wp_cache_flush_local();
+echo "SECOND PAGELOAD\n";
+do_pageload();
+[/editor]
+
+<!--nextpage-->
+
+<h2><code>get_multi()</code></h2>
+
+Every call to <code>wp_cache_get()</code> is one roundtrip to Memcached.
+
+Consolidate calls with <code>wp_cache_get_multi()</code>.
+
+[code lang=php]
+function get_things( $args ) {
+  $ids = get_thing_ids( $args );
+
+  // Prime the cache
+  wp_cache_get_multi( array( 'thing' => $ids ) );
+
+  return array_combine(
+    $ids,
+    array_map( 'get_thing', $ids )
+  );
+}
+
+// Cache each thing object separately
+function get_thing( $id ) {
+  $thing = wp_cache_get( $id, 'thing', false, $found );
+  if ( $found ) {
+    return $thing;
+  }
+
+  $thing = raw_get_thing( $id );
+
+  wp_cache_add( $id, $thing, 'thing' );
+
+  return $thing;
+}
+
+// Cache query as list of IDs instead of
+// list of thing objects
+function get_thing_ids( $args ) {
+  $key = md5( serialize( $args ) );
+  $ids = wp_cache_get( $key, 'thing_ids', false, $found );
+  if ( $found ) {
+    return $ids;
+  }
+
+  $ids = raw_get_thing_ids( $args );
+
+  wp_cache_add( $key, $ids, 'thing_ids', 300 );
+
+  return $ids;
+}
+[/code]
+
+[editor lang=php memcached=debug]
+function do_pageload() {
+  echo "First Requests\n";
+  do_requests();
+  echo "Second Requests\n";
+  do_requests();
+}
+
+function do_requests() {
+  $a = microtime( true );
+  get_things( array( 'number' => 4 ) );
+  $b = microtime( true );
+  get_things( array( 'number' => 3 ) );
+  $c = microtime( true );
+
+  printf( "get_things(4) : %8.6f\n", $b - $a );
+  printf( "get_things(3) : %8.6f\n", $c - $b );
+}
+
+wp_cache_flush();
+echo "FIRST PAGELOAD\n";
+do_pageload();
+
+echo "\n";
+
+wp_cache_flush_local();
+echo "SECOND PAGELOAD\n";
+do_pageload();
+[/editor]
+
+<!--nextpage-->
+
+<h2>Lessons?</h2>
+
+You need to understand your usage patterns.
+
+The naive way looks good unless:
+<ul>
+	<li>You also do <code>get_thing( $id )</code> calls independently of <code>get_things()</code> results.</li>
+	<li>
+		Your things are large objects.
+		In that case you end up storing too many bytes in Memcached.
+	</li>
+</ul>
+
+Storing by ID and using <code>wp_get_cache_multi()</code> is probably the best approach.
+
+It's never much worse, and usually significantly better.
+
+<!--nextpage-->
+
+<h2>Group Invalidation</h2>
+
+Instead of having a short expiry time (300 seconds), it might be better if we could have a long (indefinite) expiry time and invalidate as needed.
+
+Sadly, Memcached can't invalidate groups. (Memcached doesn't really have groups, anyway.)
+
+So we have to implement something ourselves.
+
+[code lang=php]
+
+// Cache query as list of IDs instead of
+// list of thing objects
+// Dynamic Group for Group Invalidation
+function get_thing_ids( $args ) {
+  $key = md5( serialize( $args ) );
+  $group = get_cache_group( 'thing_ids' );
+
+  $ids = wp_cache_get( $key, $group, false, $found );
+  if ( $found ) {
+    return $ids;
+  }
+
+  $ids = raw_get_thing_ids( $args );
+
+  // No expiration
+  wp_cache_add( $key, $ids, $group );
+
+  return $ids;
+}
+
+
+function get_cache_group( $group ) {
+  $incrementor = wp_cache_get(
+    $group, 'incrementors', false, $found
+  );
+  if ( ! $found ) {
+    $incrementor = time();
+    wp_cache_set( $group, $incrementor, 'incrementors' );
+  }
+
+  return "$group_" . $incrementor;
+}
+
+function flush_cache_group( $group ) {
+  // Atomic!
+  return wp_cache_incr( $group, 'incrementors' );
+}
+[/code]
+
+A word of caution: <strong>Eviction</strong>.
+
+If your incrementors and data are in different Memcached buckets, your incrementors can get evicted before your data does.
+
+That means your incrementor can get <strong>lowered</strong> to an old value, which could cause stale data to be served.
+
+The above snippet initializes the incrementor with <code>time()</code>, but the issue remains. There are probably race conditions when everything is stored in the same bucket as well.
+
+Core tried increments and failed: <a href="http://core.trac.wordpress.org/changeset/23401">[23401]</a>. Switched to <code>microtime()</code> instead.
+
+<!--nextpage-->
+
+<h2>Real World: Advanced Post Cache</h2>
+
+WordPress.com uses a (slightly more complicated) version of this Group Invalidation via Incrementors pattern for post queries.
+
+Caches query and the corresponding FOUND_ROWS() query.
+
+Uses <code>wp_cache_add()</code> to write to both caches (posts and found rows).
+
+Switches to <code>wp_cache_set()</code> (should maybe <code>wp_cache_delete()</code>) if it thinks the two have gotten out of sync.
+
+Greatly speeds up post queries (core does some of this now...)
+
+Mostly bug free :)
+
+Invalidation is tricky: we do it too often.
+
+[code lang=php]
+<?php
+
+/*
+Plugin Name: Advanced Post Caching
+Description: Cache post queries.
+Version: 0.2
+Author: Automattic
+Author URI: http://automattic.com/
+*/
+
+class Advanced_Post_Cache {
+	var $CACHE_GROUP_PREFIX = 'advanced_post_cache_';
+
+	// Flag for temp (within one page load) turning invalidations on and off
+	// @see dont_clear_advanced_post_cache()
+	// @see do_clear_advanced_post_cache()
+	// Used to prevent invalidation during new comment
+	var $do_flush_cache = true;
+
+	// Flag for preventing multiple invalidations in a row: clean_post_cache() calls itself recursively for post children.
+	var $need_to_flush_cache = true; // Currently disabled
+
+/* Per cache-clear data */
+	var $cache_incr = 0; // Increments the cache group (advanced_post_cache_0, advanced_post_cache_1, ...)
+	var $cache_group = ''; // CACHE_GROUP_PREFIX . $cache_incr
+
+/* Per query data */
+	var $cache_key = ''; // md5 of current SQL query
+	var $all_post_ids = false; // IDs of all posts current SQL query returns
+	var $cached_post_ids = array(); // subset of $all_post_ids whose posts are currently in cache
+	var $cached_posts = array();
+	var $found_posts = false; // The result of the FOUND_ROWS() query
+	var $cache_func = 'wp_cache_add'; // Turns to set if there seems to be inconsistencies
+
+	function __construct() {
+		wp_cache_add_group_prefix_map( $this->CACHE_GROUP_PREFIX, 'advanced_post_cache' );
+
+		$this->setup_for_blog();
+
+		add_action( 'switch_blog', array( $this, 'setup_for_blog' ), 10, 2 );
+
+		add_filter( 'posts_request', array( &$this, 'posts_request' ) ); // Short circuits if cached
+		add_filter( 'posts_results', array( &$this, 'posts_results' ) ); // Collates if cached, primes cache if not
+
+		add_filter( 'post_limits_request', array( &$this, 'post_limits_request' ), 999, 2 ); // Checks to see if we need to worry about found_posts
+
+		add_filter( 'found_posts_query', array( &$this, 'found_posts_query' ) ); // Short circuits if cached
+		add_filter( 'found_posts', array( &$this, 'found_posts' ) ); // Reads from cache if cached, primes cache if not
+	}
+
+	function setup_for_blog( $new_blog_id = false, $previous_blog_id = false ) {
+		if ( $new_blog_id && $new_blog_id == $previous_blog_id ) {
+			return;
+		}
+
+		$this->cache_incr = wp_cache_get( 'advanced_post_cache', 'cache_incrementors' ); // Get and construct current cache group name
+		if ( !is_numeric( $this->cache_incr ) ) {
+			$now = time();
+			wp_cache_set( 'advanced_post_cache', $now, 'cache_incrementors' );
+			$this->cache_incr = $now;
+		}
+		$this->cache_group = $this->CACHE_GROUP_PREFIX . $this->cache_incr;
+	}
+
+/* Advanced Post Cache API */
+
+	/**
+	 * Flushes the cache by incrementing the cache group
+	 */
+	function flush_cache() {
+		// Cache flushes have been disabled
+		if ( !$this->do_flush_cache )
+			return;
+
+		// Bail on post preview
+		if ( is_admin() && isset( $_POST['wp-preview'] ) && 'dopreview' == $_POST['wp-preview'] )
+			return;
+
+		// Bail on autosave
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE )
+			return;
+
+		// We already flushed once this page load, and have not put anything into the cache since.
+		// OTHER processes may have put something into the cache!  In theory, this could cause stale caches.
+		// We do this since clean_post_cache() (which fires the action this method attaches to) is called RECURSIVELY for all descendants.
+//		if ( !$this->need_to_flush_cache )
+//			return;
+
+		$this->cache_incr = wp_cache_incr( 'advanced_post_cache', 1, 'cache_incrementors' );
+		if ( 10 < strlen( $this->cache_incr ) ) {
+			wp_cache_set( 'advanced_post_cache', 0, 'cache_incrementors' );
+			$this->cache_incr = 0;
+		}
+		$this->cache_group = $this->CACHE_GROUP_PREFIX . $this->cache_incr;
+		$this->need_to_flush_cache = false;
+	}
+
+
+/* Cache Reading/Priming Functions */
+
+	/** 
+	 * Determines (by hash of SQL) if query is cached.
+	 * If cached: Return query of needed post IDs.
+	 * Otherwise: Returns query unchanged.
+	 */
+	function posts_request( $sql ) {
+		global $wpdb;
+
+		$this->cache_key = md5( $sql ); // init
+		$this->all_post_ids = wp_cache_get( $this->cache_key, $this->cache_group );
+		if ( 'NA' !== $this->found_posts )
+			$this->found_posts = wp_cache_get( "{$this->cache_key}_found", $this->cache_group );
+
+		if ( $this->all_post_ids xor $this->found_posts )
+			$this->cache_func = 'wp_cache_set';
+		else
+			$this->cache_func = 'wp_cache_add';
+
+		$this->cached_post_ids = array(); // re-init
+		$this->cached_posts = array(); // re-init
+
+		// Query is cached
+		if ( $this->found_posts && is_array( $this->all_post_ids ) ) {
+			$this->cached_posts = array_filter( wp_cache_get_multi( array( 'posts' => $this->all_post_ids ) ) );
+			foreach ( $this->cached_posts as $post ) { 
+				if ( !empty( $post ) )
+					$this->cached_post_ids[] = $post->ID;
+			} 
+			$uncached_post_ids = array_diff( $this->all_post_ids, $this->cached_post_ids );
+
+			if ( $uncached_post_ids )
+				return "SELECT * FROM $wpdb->posts WHERE ID IN(" . join( ',', array_map( 'absint', $uncached_post_ids ) ) . ")";
+			return '';
+		}
+
+		return $sql;
+	}
+
+	/** 
+	 * If cached: Collates posts returned by SQL query with posts that are already cached.  Orders correctly.
+	 * Otherwise: Primes cache with data for current posts WP_Query.
+	 */
+	function posts_results( $posts ) {
+		if ( $this->found_posts && is_array( $this->all_post_ids ) ) { // is cached
+			$collated_posts = array();
+			foreach ( $this->cached_posts as $post )
+				$posts[] = $post;
+
+			foreach ( $posts as $post ) {
+				$loc = array_search( $post->ID, $this->all_post_ids );
+				if ( is_numeric( $loc ) && -1 < $loc )
+					$collated_posts[$loc] = $post;
+			}
+			ksort( $collated_posts );
+			return array_map( 'get_post', array_values( $collated_posts ) );
+		}
+
+		$post_ids = array();
+		foreach ( (array) $posts as $post )
+			$post_ids[] = $post->ID;
+
+		if ( !$post_ids )
+			return array();
+
+		call_user_func( $this->cache_func, $this->cache_key, $post_ids, $this->cache_group );
+		$this->need_to_flush_cache = true;
+
+		return array_map( 'get_post', $posts );
+	}
+
+	/**
+	 * If $limits is empty, WP_Query never calls the found_rows stuff, so we set $this->found_rows to 'NA'
+	 */
+	function post_limits_request( $limits, &$query ) {
+		if ( empty( $limits ) || ( isset( $query->query_vars['no_found_rows'] ) && $query->query_vars['no_found_rows'] ) )
+			$this->found_posts = 'NA';
+		else
+			$this->found_posts = false; // re-init
+		return $limits;
+	}
+
+	/**
+	 * If cached: Blanks SELECT FOUND_ROWS() query.  This data is already stored in cache.
+	 * Otherwise: Returns query unchanged.
+	 */
+	function found_posts_query( $sql ) {
+		if ( $this->found_posts && is_array( $this->all_post_ids ) ) // is cached
+			return '';
+		return $sql;
+	}
+
+	/**
+	 * If cached: Returns cached result of FOUND_ROWS() query.
+	 * Otherwise: Returs result unchanged
+	 */
+	function found_posts( $found_posts ) {
+		if ( $this->found_posts && is_array( $this->all_post_ids ) ) // is cached
+			return (int) $this->found_posts;
+
+		call_user_func( $this->cache_func, "{$this->cache_key}_found", (int) $found_posts, $this->cache_group );
+		$this->need_to_flush_cache = true;
+
+		return $found_posts;
+	}
+}
+
+global $advanced_post_cache_object;
+$advanced_post_cache_object = new Advanced_Post_Cache;
+
+function clear_advanced_post_cache() {
+	global $advanced_post_cache_object;
+	$advanced_post_cache_object->flush_cache();
+}
+
+function do_clear_advanced_post_cache() {
+	$GLOBALS['advanced_post_cache_object']->do_flush_cache = true;
+}
+
+function dont_clear_advanced_post_cache() {
+	$GLOBALS['advanced_post_cache_object']->do_flush_cache = false;
+}
+
+add_action( 'clean_term_cache', 'clear_advanced_post_cache' );
+add_action( 'clean_post_cache', 'clear_advanced_post_cache' );
+
+// Don't clear Advanced Post Cache for a new comment - temp core hack
+// http://core.trac.wordpress.org/ticket/15565
+// https://wpcom.trac.automattic.com/changeset/30543/
+add_action( 'wp_updating_comment_count', 'dont_clear_advanced_post_cache' );
+add_action( 'wp_update_comment_count'  , 'do_clear_advanced_post_cache'   );
+[/code]
+
+<!--nextpage-->
+
+<h2>That's Cool, But...</h2>
+
+Enough with the cacheing things that look like database rows.
+
+What else should we cache?
+
+<ul>
+	<li>State</li>
+	<li>HTTP Requests</li>
+	<li>Output</li>
+	<li>Computations</li>
+	<li>...</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Cacheing State</h2>
+
+Rather than probing for state all the time, sometimes it's useful to cache.
+
+Two network examples.
+
+<!--nextpage-->
+
+<h2>State Example: HTTP Requests</h2>
+
+<code>wpcom_vip_file_get_contents()</code> caches the state of remote servers.
+
+Uses Memcached since the state isn't critical.
+
+Remembers if the remote host is inaccessible.
+
+If the host is down, no requests will be sent to it, which means WordPress.com isn't brought down by unresponsive hosts.
+
+(Includes Fallback.)
+
+[code lang=php]
+/**
+ * Fetch a remote URL and cache the result for a certain period of time.
+ *
+ * This function originally used file_get_contents(), hence the function name.
+ * While it no longer does, it still operates the same as the basic PHP function.
+ *
+ * We strongly recommend not using a $timeout value of more than 3 seconds as this
+ * function makes blocking requests (stops page generation and waits for the response).
+ * 
+ * The $extra_args are:
+ *  * obey_cache_control_header: uses the "cache-control" "max-age" value if greater than $cache_time.
+ *  * http_api_args: see http://codex.wordpress.org/Function_API/wp_remote_get
+ *
+ * @link http://lobby.vip.wordpress.com/best-practices/fetching-remote-data/ Fetching Remote Data
+ * @param string $url URL to fetch
+ * @param int $timeout Optional. The timeout limit in seconds; valid values are 1-10. Defaults to 3.
+ * @param int $cache_time Optional. The minimum cache time in seconds. Valid values are >= 60. Defaults to 900.
+ * @param array $extra_args Optional. Advanced arguments: "obey_cache_control_header" and "http_api_args".
+ * @return string The remote file's contents (cached)
+ */
+function wpcom_vip_file_get_contents( $url, $timeout = 3, $cache_time = 900, $extra_args = array() ) {
+	global $blog_id;
+
+	$extra_args_defaults = array(
+		'obey_cache_control_header' => true, // Uses the "cache-control" "max-age" value if greater than $cache_time
+		'http_api_args' => array(), // See http://codex.wordpress.org/Function_API/wp_remote_get
+	);
+
+	$extra_args = wp_parse_args( $extra_args, $extra_args_defaults );
+
+	$cache_key       = md5( serialize( array_merge( $extra_args, array( 'url' => $url ) ) ) );
+	$backup_key      = $cache_key . '_backup';
+	$disable_get_key = $cache_key . '_disable';
+	$cache_group     = 'wpcom_vip_file_get_contents';
+
+	// Temporary legacy keys to prevent mass cache misses during our key switch
+	$old_cache_key       = md5( $url );
+	$old_backup_key      = 'backup:' . $old_cache_key;
+	$old_disable_get_key = 'disable:' . $old_cache_key;
+
+	// Let's see if we have an existing cache already
+	// Empty strings are okay, false means no cache
+	if ( false !== $cache = wp_cache_get( $cache_key, $cache_group) )
+		return $cache;
+
+	// Legacy
+	if ( false !== $cache = wp_cache_get( $old_cache_key, $cache_group) )
+		return $cache;
+
+	// The timeout can be 1 to 10 seconds, we strongly recommend no more than 3 seconds
+	$timeout = min( 10, max( 1, (int) $timeout ) );
+
+	if ( $timeout > 3 )
+		_doing_it_wrong( __FUNCTION__, 'Using a timeout value of over 3 seconds is strongly discouraged because users have to wait for the remote request to finish before the rest of their page loads.', null );
+
+	$server_up = true;
+	$response = false;
+	$content = false;
+
+	// Check to see if previous attempts have failed
+	if ( false !== wp_cache_get( $disable_get_key, $cache_group ) ) {
+		$server_up = false;
+	}
+	// Legacy
+	elseif ( false !== wp_cache_get( $old_disable_get_key, $cache_group ) ) {
+		$server_up = false;
+	}
+	// Otherwise make the remote request
+	else {
+		$http_api_args = (array) $extra_args['http_api_args'];
+		$http_api_args['timeout'] = $timeout;
+		$response = wp_remote_get( $url, $http_api_args );
+	}
+
+	// Was the request successful?
+	if ( $server_up && ! is_wp_error( $response ) && 200 == wp_remote_retrieve_response_code( $response ) ) {
+		$content = wp_remote_retrieve_body( $response );
+
+		$cache_header = wp_remote_retrieve_header( $response, 'cache-control' );
+		if ( is_array( $cache_header ) )
+			$cache_header = array_shift( $cache_header );
+
+		// Obey the cache time header unless an arg is passed saying not to
+		if ( $extra_args['obey_cache_control_header'] && $cache_header ) {
+			$cache_header = trim( $cache_header );
+			// When multiple cache-control directives are returned, they are comma separated
+			foreach ( explode( ',', $cache_header ) as $cache_control ) {
+				// In this scenario, only look for the max-age directive
+				if( 'max-age' == substr( trim( $cache_control ), 0, 7 ) )
+					list( $cache_header_type, $cache_header_time ) = explode( '=', trim( $cache_control ) );
+			}
+			// If the max-age directive was found and had a value set that is greater than our cache time
+			if ( isset( $cache_header_type ) && isset( $cache_header_time ) && $cache_header_time > $cache_time )
+				$cache_time = (int) $cache_header_time; // Casting to an int will strip "must-revalidate", etc.
+		}
+
+		// The cache time shouldn't be less than a minute
+		// Please try and keep this as high as possible though
+		// It'll make your site faster if you do
+		$cache_time = (int) $cache_time;
+		if ( $cache_time < 60 )
+			$cache_time = 60;
+
+		// Cache the result
+		wp_cache_set( $cache_key, $content, $cache_group, $cache_time );
+
+		// Additionally cache the result with no expiry as a backup content source
+		wp_cache_set( $backup_key, $content, $cache_group );
+
+		// So we can hook in other places and do stuff
+		do_action( 'wpcom_vip_remote_request_success', $url, $response );
+	}
+	// Okay, it wasn't successful. Perhaps we have a backup result from earlier.
+	elseif ( $content = wp_cache_get( $backup_key, $cache_group ) ) {
+		// If a remote request failed, log why it did
+		if ( $response && ! is_wp_error( $response ) ) {
+			error_log( "wpcom_vip_file_get_contents: Blog ID {$blog_id}: Failure for $url and the result was: " . maybe_serialize( $response['headers'] ) . ' ' . maybe_serialize( $response['response'] ) );
+		} elseif ( $response ) { // is WP_Error object
+			error_log( "wpcom_vip_file_get_contents: Blog ID {$blog_id}: Failure for $url and the result was: " . maybe_serialize( $response ) );
+		}
+	}
+	// Legacy
+	elseif ( $content = wp_cache_get( $old_backup_key, $cache_group ) ) {
+		// If a remote request failed, log why it did
+		if ( $response && ! is_wp_error( $response ) ) {
+			error_log( "wpcom_vip_file_get_contents: Blog ID {$blog_id}: Failure for $url and the result was: " . maybe_serialize( $response['headers'] ) . ' ' . maybe_serialize( $response['response'] ) );
+		} elseif ( $response ) { // is WP_Error object
+			error_log( "wpcom_vip_file_get_contents: Blog ID {$blog_id}: Failure for $url and the result was: " . maybe_serialize( $response ) );
+		}
+	}
+	// We were unable to fetch any content, so don't try again for another 60 seconds
+	elseif ( $response ) {
+		wp_cache_set( $disable_get_key, 1, $cache_group, 60 );
+
+		// If a remote request failed, log why it did
+		if ( $response && ! is_wp_error( $response ) ) {
+			error_log( "wpcom_vip_file_get_contents: Blog ID {$blog_id}: Failure for $url and the result was: " . maybe_serialize( $response['headers'] ) . ' ' . maybe_serialize( $response['response'] ) );
+		} elseif ( $response ) { // is WP_Error object
+			error_log( "wpcom_vip_file_get_contents: Blog ID {$blog_id}: Failure for $url and the result was: " . maybe_serialize( $response ) );
+		}
+		// So we can hook in other places and do stuff
+		do_action( 'wpcom_vip_remote_request_error', $url, $response );
+	}
+
+	return $content;
+}
+[/code]
+
+<!--nextpage-->
+
+<h2>APC: Alternative PHP Cache</h2>
+
+APC does two things:
+<ul>
+	<li>Caches the intermediate bytecode of PHP files so that they don't have to be compiled for every request.</li>
+	<li>Provides a persistent, shared-memory key-value store.</li>
+</ul>
+
+<h3>Bytecode Cache</h3>
+
+Without it, WordPress.com would fall over :)
+
+It dramatically improves the number of requests/second we can serve.
+
+<h3>Key-Value Store</h3>
+
+Very different than Memcached's; it's local.
+
+Something stored on one web server is not accessible to another web server.
+
+WordPress.com has 800+ web servers, so APC's utility seems limited.
+
+There's one important place, though, where this per-host cache is a feature: HyperDB.
+
+<!--nextpage-->
+
+<h2>State Example: HyperDB</h2>
+
+When a DB server is unresponsive, we flag it as such and look to other DB servers.
+
+Responsiveness is affected by network topology, so we need per-host flags.
+
+We want the flags to be persistent across page loads.
+
+APC to the rescue.
+
+Note similarities between this and <code>wpcom_vip_file_get_contents()</code>.
+
+[code lang=php]
+/**
+ * Check the responsiveness of a tcp/ip daemon
+ * @return (string) 'up' when $host:$post responds within $float_timeout seconds, 
+ * otherwise a string with details about the failure.
+ */
+function check_tcp_responsiveness( $host, $port, $float_timeout ) {
+  if ( function_exists( 'apc_store' ) ) {
+    $use_apc = true;
+    $apc_key = "tcp_responsive_{$host}{$port}";
+    $apc_ttl = 10;
+  } else {
+    $use_apc = false;
+  }
+
+  if ( $use_apc ) {
+    $server_state = apc_fetch( $apc_key );
+    if ( $server_state )
+      return $server_state;
+  }
+
+  $socket = @ fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+  if ( $socket === false ) {
+    $server_state = "down [ > $float_timeout ] ($errno) '$errstr'";
+    if ( $use_apc )
+      apc_store( $apc_key, $server_state, $apc_ttl );
+
+    return $server_state;
+  }
+
+  fclose( $socket );
+
+  if ( $use_apc )
+    apc_store( $apc_key, 'up', $apc_ttl );
+
+  return 'up';
+}
+
+function get_server_state( $host, $port, $timeout ) {
+  // We still do the check_tcp_responsiveness() until we have 
+  // mysql_connect() function with less than 1 second timeout
+  if ( $this->check_tcp_responsiveness ) {
+    $server_state = $this->check_tcp_responsiveness( $host, $port, $timeout );
+    if ( 'up' !== $server_state )
+      return $server_state;
+  }
+
+  if ( ! function_exists( 'apc_store' ) )
+    return 'up';
+
+  $server_state = apc_fetch( "server_state_$host$port" );
+  if ( ! $server_state )
+    return 'up';
+
+  return $server_state;
+}
+[/code]
+
+<!--nextpage-->
+
+<h2>HTTP Requests</h2>
+
+Boring :)
+
+Tools already exist: <code>wpcom_vip_file_get_contents()</code>
+
+Excuse to talk about...
+
+<!--nextpage-->
+
+<h2>Locking and Fallback</h2>
+
+High concurrency and cache misses of expensive objects don't mix.
+
+Doesn't matter what cacheing backend you use (WordPress, Memcached, ... ).
+
+3 seconds calculation * 100 pageloads a second
+= 300 processes all trying to calculate the same thing.
+
+"Cache Miss Stampede"
+
+Need locking and some sort of smart fallback.
+
+[code lang=php]
+function with_cache_lock_and_fallback(
+  $callback, $key, $group, $expires = 30
+) {
+
+  $value = wp_cache_get( $key, $group, false, $found );
+
+  if ( ! $found ) {
+    // Cache is empty.  Update it.
+    echo "UNCACHED - Caching...\n";
+
+    // Tell other processes to fallback if possible
+    // MC adds succeed only if there is not already
+    // a value for that key, but
+    // DANGER: not multi-DC aware
+    $added = wp_cache_add(
+      $key, '--FALLBACK--', $group, $expires
+    );
+
+    if ( $added ) {
+      // This process successfully added
+
+      // Get new value
+      $value = call_user_func( $callback );
+
+      // Cache value with the specified expiration
+      // Replace would be nice, but multi-DC
+      // makes it tricky
+      wp_cache_set( $key, $value, $group, $expires );
+
+      // Cache value as backup without expiration
+      wp_cache_set( "{$key}_old", $value, $group, 0 );
+
+      return $value;
+    } else {
+      // This process did not successfully add.
+      // Some other process must have gotten there first.
+      // Fallback
+
+      $value = '--FALLBACK--';
+    }
+  }
+
+  if ( '--FALLBACK--' === $value ) {
+    // Cache is empty, but some other process is
+    // already filling it.
+    // Fallback to old value
+    echo "FALLBACK\n";
+        return wp_cache_get( "{$key}_old", $group );
+  }
+
+  // Yay! Cached.
+  echo "CACHED\n";
+  return $value;
+}
+
+function slow() {
+  sleep( 3 );
+  return "Hello World! " . gmdate( 'Y-m-d H:i:s' );
+}
+[/code]
+
+[editor lang=php]
+wp_cache_flush();
+echo "Cache FLUSHED @ " . gmdate( 'Y-m-d H:i:s' );
+[/editor]
+
+[editor lang=php]
+$a = microtime( true );
+$slow = slow();
+$b = microtime( true );
+
+var_dump( $slow );
+var_dump( $b - $a );
+[/editor]
+
+[editor lang=php]
+$a = microtime( true );
+$slow = with_cache_lock_and_fallback( 'slow', 'slow-key', 'slow-group', 10 );
+$b = microtime( true );
+
+var_dump( $slow );
+var_dump( $b - $a );
+[/editor]
+
+<!--nextpage-->
+
+<h2>WordPress Locks</h2>
+
+Even without Memcached, fiddling with transients or custom code, WordPress already provides locked processes.
+
+WP Cron!
+
+Yes, there are issues, but 3 concurrent processes is better than 300 :)
+
+<!--nextpage-->
+
+<h2>Who Needs Locking?</h2>
+
+Instead of generating the data on view, try to prime the cache on write.
+
+For example, tag clouds only change when posts are created, updated, deleted.
+
+Cache the tag cloud indefinitely. Regenerate on posts change.
+
+Remember: 4 &gt; 3 &gt; 2 &gt; 1 :)
+
+<!--nextpage-->
+
+<h2>Output Cache</h2>
+
+<ul>
+	<li>A bunch of Widgets</li>
+	<li>Batcache</li>
+	<li>nginx</li>
+</ul>
+
+<!--nextpage-->
+
+<h2>Widget Output Cache</h2>
+
+Boring :)
+
+<!--nextpage-->
+
+<h2>Batcache</h2>
+
+PHP based page output cache implemented via Memcached.
+
+<a href="https://github.com/skeltoac/batcache">https://github.com/skeltoac/batcache</a>
+
+WordPress.com uses it for almost all non-admin page views.
+
+When a page gets viewed several times in rapid succession, the page is cached and subsequent views are served from the cache.
+
+Bypassed for logged in users, previous commenters, etc.
+
+<!--nextpage-->
+
+<h2>nginx</h2>
+
+Great because it bypasses all of PHP, which makes Barry very happy.
+
+WordPress.com uses it for feeds, a few other things.
+
+And so can you!
+
+<!--nextpage-->
+
+<h2>Example: Metro UK's Sitemaps</h2>
+
+Sitemaps are updated by WP Cron, stored in Custom Post Types, cached by nginx, with some extra state held in WordPress Options.
+
+8-)
+
+A good example since:
+<ul>
+	<li>There's not too many files</li>
+	<li>The files all have a predetermined URL structure</li>
+</ul>
+
+Pros: Fancy, fast.
+Cons: Need help from VIP and Systems.
+
+[code lang=php]
+<?php
+/*
+Plugin Name: Metro Google Sitemap
+Plugin URI: 
+Description: Metro Google Sitemap
+Author: Artur Synowiec
+Author URI: 
+Version: 0.1
+Stable tag: 0.1
+License: Metro
+*/
+define( 'MGS_INTERVAL_PER_GENERATION_EVENT', 60 ); // how far apart should full cron generation events be spaced
+define( 'MGS_INTERVAL_PER_YEAR_GENERATION', 10800 ); // 3 hrs minimum time span between each whole update run
+
+// A cron schedule for creating/updating sitemap posts based on updated content since the last run
+add_action( 'init', 'mgs_sitemap_init_cron' );
+
+/* 15 minutes cron interval for latest articles */
+function mgs_sitemap_15_min_cron_interval( $schedules ) {
+	$schedules[ 'mgs-sitemap-15-min-cron-interval' ] = array(
+		'interval' => 900,
+		'display' => __( 'Every 15 minutes' )
+	);
+	return $schedules;
+}
+
+add_filter( 'cron_schedules', 'mgs_sitemap_15_min_cron_interval' );
+
+function mgs_sitemap_init_cron() {
+	if ( ! wp_next_scheduled( 'mgs_cron_update_sitemap' ) ) {
+		wp_schedule_event( time(), 'mgs-sitemap-15-min-cron-interval', 'mgs_cron_update_sitemap' );
+	}
+	add_action( 'mgs_cron_update_sitemap', 'mgs_update_sitemap_from_modified_posts' );
+
+	add_action( 'mgs_cron_generate_sitemap_for_year', 'mgs_generate_sitemap_for_year' );
+	add_action( 'mgs_cron_generate_sitemap_for_year_month', 'mgs_generate_sitemap_for_year_month' );
+	add_action( 'mgs_cron_generate_sitemap_for_year_month_day', 'mgs_generate_sitemap_for_year_month_day' );
+
+	add_action( 'mgs_insert_sitemap_post', 'msg_queue_nginx_cache_invalidation', 10, 4 );
+	add_action( 'mgs_delete_sitemap_post', 'msg_queue_nginx_cache_invalidation', 10, 4 );
+	add_action( 'mgs_update_sitemap_post', 'msg_queue_nginx_cache_invalidation', 10, 4 );
+}
+
+function mgs_disable_canonical_redirects_for_sitemap_xml($redirect_url, $requested_url) { 
+	if(preg_match('|sitemap\.xml|', $requested_url)) { 
+		return $requested_url; 
+	}
+	return $redirect_url; 
+}
+
+add_action('redirect_canonical', 'mgs_disable_canonical_redirects_for_sitemap_xml', 10, 2);
+
+function mgs_add_google_sitemap_endpoint() {
+	define( 'WPCOM_SKIP_DEFAULT_SITEMAP', true );
+	add_rewrite_tag('%google-sitemap%', 'true'); // allow 'google-sitemap=true' parameter
+	add_rewrite_rule('^sitemap.xml$','index.php?google-sitemap=true','top');
+}
+add_action('init', 'mgs_add_google_sitemap_endpoint');
+
+
+add_action('admin_menu', 'mgs_google_sitemap_menu');
+
+function mgs_google_sitemap_menu() {
+	add_options_page('Metro Google Sitemap Options', 'Create Google Sitemap', 'manage_options', 'metro-google-sitemap', 'mgs_google_sitemap_options');
+}
+
+function mgs_google_sitemap_options() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( __('You do not have sufficient permissions to access this page.') );
+	}
+
+	$sitemap_create_last_run = get_option( 'mgs_sitemap_create_last_run' );
+	$sitemap_create_last_run_today = $sitemap_create_last_run && date( 'Y-m-d' ) == date( 'Y-m-d', $sitemap_create_last_run );
+	$sitemap_update_last_run = get_option( 'mgs_sitemap_update_last_run' );
+	$sitemap_update_next_run = $sitemap_update_last_run + 900;
+	$modified_posts = mgs_get_last_modified_posts();
+	$modified_posts_count = count( $modified_posts );
+	$modified_posts_label = $modified_posts_count == 1 ? 'post' : 'posts';
+
+	echo '<div class="wrap">';
+	screen_icon();
+	echo '<h2>Metro Google sitemap</h2>';
+	
+	if ( isset( $_POST['action'] ) ) {
+
+		if ($_POST['action'] == 'generate-latest-google-sitemap') {
+			check_admin_referer( 'generate-latest-google-sitemap' );
+		
+			$last_modified = mgs_get_last_modified_posts();
+			if(count($last_modified) > 0) {
+				echo "<p>Updating sitemap...</p>";
+				mgs_update_sitemap_from_modified_posts();				
+			} else {
+				echo "<p>No posts updated lately.</p>";
+			}
+		} else if($_POST['action'] == 'generate-google-sitemap') {
+			check_admin_referer( 'generate-google-sitemap' );
+			$year = (int)$_POST['year'];
+
+			// Only allow running it after 'MGS_INTERVAL_PER_YEAR_GENERATION' time span; arbitrary protection since create is a pretty intensive process
+			if(time() > $sitemap_create_last_run + MGS_INTERVAL_PER_YEAR_GENERATION) {
+				mgs_generate_full_sitemap($year);
+				echo '<p>Creating sitemap...</p>';
+			} else {
+				echo '<p>Sorry, you can run it again in '.human_time_diff($sitemap_create_last_run + MGS_INTERVAL_PER_YEAR_GENERATION).'</p>';
+			}
+
+		}
+
+		echo '<form action="options-general.php">';
+		echo ' <input type="hidden" name="page" value="metro-google-sitemap">';
+		echo ' <input type="submit" value="Back">';
+		echo '</form>';
+	} else {
+		?>
+		<p><strong>Last created:</strong> <?php echo human_time_diff( $sitemap_create_last_run ); ?> ago</p>
+		<p><strong>Last updated:</strong> <?php echo human_time_diff( $sitemap_update_last_run ); ?> ago</p>
+		<p><strong>Next update:</strong> <?php echo $modified_posts_count . ' ' . $modified_posts_label; ?> will be updated in <?php echo human_time_diff( $sitemap_update_next_run ); ?></p>
+		<?php
+		echo '<form action="'. menu_page_url( 'metro-google-sitemap', false ) .'" method="post" style="float: left;">';
+		echo ' <input type="hidden" name="action" value="generate-google-sitemap">';
+		wp_nonce_field( 'generate-google-sitemap' );
+		
+		$post_year_range = mgs_get_post_year_range();
+		$post_year_range = array_reverse($post_year_range);
+		
+		echo ' <select name="year">';
+		foreach ( $post_year_range as $year ) {
+			echo ' <option value="'.$year.'">'.$year.'</option>';
+		}
+		echo ' </select>';
+		
+		echo ' <input type="submit" value="Generate from all articles">';
+		echo '</form>';
+
+		echo '<form action="'. menu_page_url( 'metro-google-sitemap', false ) .'" method="post">';
+		echo ' <input type="hidden" name="action" value="generate-latest-google-sitemap">';
+		wp_nonce_field( 'generate-latest-google-sitemap' );
+		echo ' <input type="submit" value="Generate from latest articles">';
+		echo '</form>';
+	}
+	echo '</div>';
+
+}
+
+function mgs_get_post_year_range() {
+	global $wpdb;
+
+	$oldest_post_date_gmt = $wpdb->get_var( "SELECT post_date FROM $wpdb->posts WHERE post_status = 'publish' ORDER BY post_date ASC LIMIT 1" );
+	$oldest_post_year = date( 'Y', strtotime( $oldest_post_date_gmt ) );
+	$current_year = date( 'Y' );
+
+	return range( $oldest_post_year, $current_year );
+}
+
+function mgs_get_date_stamp( $year, $month, $day ) {
+	return sprintf( '%s-%s-%s', $year, str_pad( $month, 2, '0', STR_PAD_LEFT ), str_pad( $day, 2, '0', STR_PAD_LEFT ) );
+}
+
+function mgs_date_range_has_posts( $start_date, $end_date ) {
+	global $wpdb;
+
+	$start_date .= ' 00:00:00';
+	$end_date .= ' 23:59:59';
+
+	// TODO: need to incorporate post_type filter from mgs_get_last_modified_posts
+	return $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_status = 'publish' AND post_date >= %s AND post_date <= %s LIMIT 1", $start_date, $end_date ) );
+}
+
+/*
+ * We want to generate the entire sitemap catalogue async to avoid running into timeouta and memory issues.
+ *
+ * Here's how it all works:
+ *
+ * -- Get year range for content
+ * -- Create cron event for each year: mgs_generate_sitemap_for_year
+ * -- mgs_generate_sitemap_for_year creates cron events for each month: mgs_generate_sitemap_for_year_month
+ * -- mgs_generate_sitemap_for_year_month creates cron events for each day: mgs_generate_sitemap_for_year_month_day
+ * -- mgs_generate_sitemap_for_year_month_day gets recent posts and adds sitemap via mgs_create_sitemap
+ *
+ * We could alternatively do a cascading approach, where one year queues the next but this would require more code :)
+ * 
+ * CHANGED TO RUN ONE YEAR AT A TIME DUE TO HEAVY LOAD - each all articles update can be done within 3 hours span
+ *  
+ */
+function mgs_generate_full_sitemap($year) {
+	global $wpdb;
+
+	$time = time();
+	update_option( 'mgs_sitemap_create_last_run', $time );
+
+	$time += MGS_INTERVAL_PER_GENERATION_EVENT;
+	if (  mgs_date_range_has_posts( mgs_get_date_stamp( $year, 1, 1 ), mgs_get_date_stamp( $year, 12, 31 ) ) ) {
+		wp_schedule_single_event( $time, 'mgs_cron_generate_sitemap_for_year', array(
+			array(
+				'year' => $year,
+			)
+		) );
+	}
+	
+}
+
+
+function mgs_generate_sitemap_for_year( $args ) {
+	$year = $args['year'];
+	$months = range( 1, 12 );
+	$time = time();
+
+	foreach ( $months as $month ) {
+		$month_start =  mgs_get_date_stamp( $year, $month, 1 );
+		if ( ! mgs_date_range_has_posts( $month_start, mgs_get_date_stamp( $year, $month, date( 't', strtotime( $month_start ) ) ) ) )
+			continue;
+
+		$time += MGS_INTERVAL_PER_GENERATION_EVENT;
+		wp_schedule_single_event( $time, 'mgs_cron_generate_sitemap_for_year_month', array(
+			array(
+				'year' => $year,
+				'month' => $month,
+			)
+		) );
+	}
+}
+
+function mgs_generate_sitemap_for_year_month( $args ) {
+	$year = $args['year'];
+	$month = $args['month'];
+	$days = range( 1, 31 );
+	$time = time();
+
+	foreach ( $days as $day ) {
+		$date = mgs_get_date_stamp( $year, $month, $day );
+		$is_date = strtotime( $date );
+		
+		if ( ! $is_date )
+			continue;
+
+		if ( ! mgs_date_range_has_posts( mgs_get_date_stamp( $year, $month, $day ), mgs_get_date_stamp( $year, $month, $day ) ) )
+			continue;
+
+		$time += MGS_INTERVAL_PER_GENERATION_EVENT;
+		mgs_schedule_sitemap_for_year_month_day( $time, $year, $month, $day );
+	}
+}
+
+function mgs_schedule_sitemap_for_year_month_day( $time, $year, $month, $day ) {
+	wp_schedule_single_event( $time, 'mgs_cron_generate_sitemap_for_year_month_day', array(
+			array(
+				'year' => $year,
+				'month' => $month,
+				'day' => $day,
+			)
+		) );
+}
+
+function mgs_generate_sitemap_for_year_month_day( $args ) {
+	$year = $args['year'];
+	$month = $args['month'];
+	$day = $args['day'];
+
+	$date = mgs_get_date_stamp( $year, $month, $day );
+
+	mgs_generate_sitemap_for_date( $date );
+}
+
+function mgs_generate_sitemap_for_date( $sitemap_date ) {
+	global $wpdb;
+
+	$sitemap_time = strtotime( $sitemap_date );
+	list( $year, $month, $day ) = explode( '-', $sitemap_date );
+
+	$sitemap_name = $sitemap_date;
+	$sitemap_exists = false;
+
+	$sitemap_id = $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_type = %s AND post_name = %s LIMIT 1", 'mgs_sitemap', $sitemap_name ) );
+
+	if ( $sitemap_id )
+		$sitemap_exists = true;
+
+	$query_args = array(
+		'year' => $year,
+		'monthnum' => $month,
+		'day' => $day,
+		'order' => 'DESC',
+		'post_status' => 'publish',
+		'post_type' => apply_filters( 'mgs_sitemap_entry_post_type', 'post' ),
+		'posts_per_page' => apply_filters( 'mgs_sitemap_entry_posts_per_page', 200 ),
+		'no_found_rows' => true,
+	);
+
+	$query = new WP_Query( $query_args );
+	$post_count = $query->post_count;
+
+	if ( ! $post_count ) {
+		// If no entries - delete the whole sitemap post
+		if ( $sitemap_exists ) {
+			wp_delete_post( $sitemap_id, true );
+			do_action( 'mgs_delete_sitemap_post', $sitemap_id, $year, $month, $day );
+		}
+		return;
+	}
+
+	// Create XML
+	$xml = '<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:n="http://www.google.com/schemas/sitemap-news/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">';
+	
+	while ( $query->have_posts() ) {
+		$query->the_post();
+
+		$url = '<url>';
+		$loc = '<loc>'.get_permalink().'</loc>';
+		$lastmod = '<lastmod>'.get_the_modified_date('Y-m-d').'T'.get_the_modified_date('H:i:s').'Z</lastmod>';
+		$url .= $loc;
+		$url .= $lastmod;
+		$content = get_the_content();
+		$images_xml = '';
+		/** Include inline images (parse content using DOM parser) */
+		/*  // commented out due to resize errors 
+		$dom = new DOMDocument();
+		$dom->loadHTML($content);
+		$nodes = $dom->getElementsByTagName('img');
+		foreach ($nodes as $img) {
+		  	$images_xml .= "<image:image><image:loc>".str_replace('&', '&amp;', $img->getAttribute('src'))."</image:loc></image:image>";
+		}
+		$url .= $images_xml;
+		*/
+		$url .= '<changefreq>monthly</changefreq>';
+		$url .= '<priority>0.7</priority>';
+		$url .= '</url>';
+		$xml .= $url;
+	}
+	
+	$xml .= '</urlset>';
+	
+	if( $sitemap_exists ) {
+		update_post_meta( $sitemap_id, 'mgs_sitemap_xml', $xml );
+		do_action( 'mgs_update_sitemap_post', $sitemap_id, $year, $month, $day );
+	} else {
+		$sitemap_data = array(
+			'post_name' => $sitemap_name,
+			'post_title' => $sitemap_name,
+			'post_type' => 'mgs_sitemap',
+			'post_status' => 'publish',
+			'post_date' => $sitemap_date,
+		);
+		$sitemap_id = wp_insert_post( $sitemap_data );
+		add_post_meta( $sitemap_id, 'mgs_sitemap_xml', $xml );
+		do_action( 'mgs_insert_sitemap_post', $sitemap_id, $year, $month, $day );
+	}
+	wp_reset_postdata();
+}
+
+add_action( 'init', 'mgs_create_post_type' );
+
+
+function mgs_create_post_type() {
+	register_post_type(
+		'mgs_sitemap',
+		array(
+			'labels' => array(
+				'name' => __( 'Google Sitemap' ),
+				'singular_name' => __( 'Google Sitemap' )
+			),
+			'public' => false,
+			'has_archive' => true,
+			'supports' => array(
+				'title',
+			),
+			'show_ui' => true, // debugging, so we can see the sitemaps that are generated
+		)
+	);
+}
+
+function mgs_get_last_modified_posts() {
+	global $wpdb;
+
+	$sitemap_last_run = get_option( 'mgs_sitemap_update_last_run', false );
+	
+	$date = date( 'Y-m-d H:i:s', ( time() - 3600 ) ); // posts changed within the last hour
+
+	if( $sitemap_last_run ) {
+		$date = date( 'Y-m-d H:i:s', $sitemap_last_run );
+	}
+	$post_types = apply_filters( 'mgs_sitemap_entry_post_type', 'post' );
+	$post_types_in = sprintf( "'%s'", implode( "','", (array) $post_types ) );
+
+	$modified_posts = $wpdb->get_results( $wpdb->prepare( "SELECT ID, post_date FROM $wpdb->posts WHERE post_type IN ( $post_types_in ) AND post_modified >= %s ORDER BY post_date LIMIT 1000", $date ) );
+	return $modified_posts;
+}
+
+function mgs_get_post_dates( $posts ) {
+	$dates = array();
+	foreach ( $posts as $post ) {
+	    $dates[] = date( 'Y-m-d', strtotime( $post->post_date ) );
+	}
+	$dates = array_unique( $dates );
+
+	return $dates;
+}
+
+function mgs_update_sitemap_from_modified_posts() {
+	$time = time();
+	$last_modified_posts = mgs_get_last_modified_posts();
+	$dates = mgs_get_post_dates( $last_modified_posts );
+
+	foreach ( $dates as $date ) {
+		list( $year, $month, $day ) = explode( '-', $date );
+		$time += MGS_INTERVAL_PER_GENERATION_EVENT;
+		mgs_schedule_sitemap_for_year_month_day( $time, $year, $month, $day );
+	}
+	update_option( 'mgs_sitemap_update_last_run', time() );
+}
+
+function msg_queue_nginx_cache_invalidation( $sitemap_id, $year, $month, $day ) {
+	$metro_uk_sitemap_urls = array(
+		"http://metro.co.uk/sitemap.xml?yyyy=$year",
+		"http://metro.co.uk/sitemap.xml?yyyy=$year&mm=$month",
+		"http://metro.co.uk/sitemap.xml?yyyy=$year&mm=$month&dd=$day",
+	);
+	queue_async_job( array( 'output_cache' => array( 'url' => $metro_uk_sitemap_urls ) ), 'wpcom_invalidate_output_cache_job', -16 );
+}
+[/code]

